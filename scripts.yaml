@@ -56,31 +56,64 @@ tts_with_volume:
     action: media_player.volume_set
 heizkreisventilsteuerung:
   alias: HeizkreisVentilSteuerung
+  description: Dispatcher, der je nach Betriebsmodus die Heiz- oder Kuehllogik fuer
+    ein Heizkreisventil aufruft.
   mode: queued
   max: 32
   fields:
     zbmini_entity:
       description: Der SONOFF ZBMINIR2 im Raum mit einem Thermostat, der das Heizkreisventil
         steuert
+      required: true
+  sequence:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: sensor.heizungsbetriebsmodus
+        state: Heating
+      sequence:
+      - action: script.heizkreisventilsteuerung_heating
+        data:
+          zbmini_entity: '{{ zbmini_entity }}'
+    - conditions:
+      - condition: state
+        entity_id: sensor.heizungsbetriebsmodus
+        state: Cooling
+      sequence:
+      - action: script.heizkreisventilsteuerung_cooling
+        data:
+          zbmini_entity: '{{ zbmini_entity }}'
+heizkreisventilsteuerung_heating:
+  alias: HeizkreisVentilSteuerung Heating
+  description: Steuert das Thermostat eines Heizkreisventils im Heizbetrieb - aus bei
+    offenem Fenster, sonst heizen.
+  mode: queued
+  max: 32
+  fields:
+    zbmini_entity:
+      description: Der SONOFF ZBMINIR2 im Raum mit einem Thermostat, der das Heizkreisventil
+        steuert
+      required: true
   variables:
     area: '{{ area_id(zbmini_entity) }}'
-    heating: '{{ is_state(''sensor.heizungsbetriebsmodus'', ''Heating'') }}'
-    any_window_open: "{{\n  expand(area_entities(area))\n  | selectattr('domain','eq','binary_sensor')\n
-      \ | selectattr('attributes.device_class','eq','window')\n  | selectattr('state','eq','on')\n
-      \ | list | length > 0\n}}"
-    thermostat: "{{\n  expand(area_entities(area))\n  | selectattr('domain','eq','climate')\n
-      \ | map(attribute='entity_id')\n  | list | first\n}}"
+    thermostat: >-
+      {{ expand(area_entities(area))
+      | selectattr('domain','eq','climate')
+      | map(attribute='entity_id')
+      | list | first }}
   sequence:
-  - condition: template
-    value_template: '{{ heating }}'
   - condition: template
     value_template: '{{ area is not none }}'
   - condition: template
     value_template: '{{ thermostat is not none }}'
+  - action: script.any_window_open
+    data:
+      area: '{{ area }}'
+    response_variable: window
   - choose:
     - conditions:
       - condition: template
-        value_template: '{{ any_window_open }}'
+        value_template: '{{ window.open }}'
       sequence:
       - action: climate.set_hvac_mode
         target:
@@ -89,13 +122,68 @@ heizkreisventilsteuerung:
           hvac_mode: 'off'
     - conditions:
       - condition: template
-        value_template: '{{ not any_window_open }}'
+        value_template: '{{ not window.open }}'
       sequence:
       - action: climate.set_hvac_mode
         target:
           entity_id: '{{ thermostat }}'
         data:
           hvac_mode: heat
+heizkreisventilsteuerung_cooling:
+  alias: HeizkreisVentilSteuerung Cooling
+  description: Schliesst im Kuehlbetrieb den Heizkreis (ZBMINI aus), wenn ein Fenster
+    laenger als 5 Minuten offen steht - als Schimmelschutz.
+  mode: parallel
+  max: 32
+  fields:
+    zbmini_entity:
+      description: Der SONOFF ZBMINIR2 im Raum, dessen Heizkreis-Relay geschaltet wird
+      required: true
+  variables:
+    area: '{{ area_id(zbmini_entity) }}'
+  sequence:
+  - condition: template
+    value_template: '{{ area is not none }}'
+  - action: script.any_window_open
+    data:
+      area: '{{ area }}'
+    response_variable: window
+  - condition: template
+    value_template: '{{ window.open }}'
+  - wait_template: >-
+      {{ expand(area_entities(area))
+      | selectattr('domain','eq','binary_sensor')
+      | selectattr('attributes.device_class','eq','window')
+      | selectattr('state','eq','on')
+      | list | length == 0 }}
+    timeout: 00:05:00
+    continue_on_timeout: true
+  - condition: template
+    value_template: '{{ not wait.completed }}'
+  - action: switch.turn_off
+    target:
+      entity_id: '{{ zbmini_entity }}'
+any_window_open:
+  alias: AnyWindowOpen
+  description: Prueft, ob in einer Area mindestens ein Fenster geoeffnet ist. Gibt
+    ein Objekt { open: bool } zurueck.
+  mode: parallel
+  max: 32
+  fields:
+    area:
+      description: Die Area-ID, in der die Fenster-Sensoren geprueft werden.
+      required: true
+  variables:
+    result:
+      open: >-
+        {{ expand(area_entities(area))
+        | selectattr('domain','eq','binary_sensor')
+        | selectattr('attributes.device_class','eq','window')
+        | selectattr('state','eq','on')
+        | list | length > 0 }}
+  sequence:
+  - stop: Fenster-Status ermittelt
+    response_variable: result
 playmedia:
   sequence:
   - variables:
@@ -164,7 +252,6 @@ setheizkreisventilebetriebsmodus:
   variables:
     ventilSwitches: '{{ expand(''switch.heizkreisventile'') | map(attribute=''entity_id'')
       | list }}'
-    heating: '{{ not is_state(''sensor.heizungsbetriebsmodus'', ''Cooling'') }}'
   sequence:
   - repeat:
       for_each: '{{ ventilSwitches }}'
@@ -177,8 +264,11 @@ setheizkreisventilebetriebsmodus:
             \ | map(attribute='entity_id')\n  | list | first\n}}"
       - choose:
         - conditions:
+          - condition: state
+            entity_id: sensor.heizungsbetriebsmodus
+            state: Heating
           - condition: template
-            value_template: '{{ heating and is_state(detached, ''on'') }}'
+            value_template: '{{ is_state(detached, ''on'') }}'
           sequence:
           - action: switch.turn_off
             target:
@@ -192,12 +282,12 @@ setheizkreisventilebetriebsmodus:
             data:
               hvac_mode: 'off'
           - action: script.heizkreisventilsteuerung
-            metadata: {}
             data:
               zbmini_entity: '{{ repeat.item }}'
         - conditions:
-          - condition: template
-            value_template: '{{ not heating }}'
+          - condition: state
+            entity_id: sensor.heizungsbetriebsmodus
+            state: Cooling
           sequence:
           - action: switch.turn_on
             target:

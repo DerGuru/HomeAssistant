@@ -403,11 +403,7 @@
     entity_id:
     - climate.thermostatburoeg
     attribute: temperature
-  conditions:
-  - condition: state
-    entity_id: sensor.heizungsbetriebsmodus
-    state:
-    - Heating
+  conditions: []
   actions:
   - delay:
       hours: 0
@@ -531,11 +527,7 @@
     entity_id:
     - climate.thermostatburoog
     attribute: temperature
-  conditions:
-  - condition: state
-    entity_id: sensor.heizungsbetriebsmodus
-    state:
-    - Heating
+  conditions: []
   actions:
   - delay:
       hours: 0
@@ -561,11 +553,7 @@
     entity_id:
     - climate.thermostatkinderzimmer
     attribute: temperature
-  conditions:
-  - condition: state
-    entity_id: sensor.heizungsbetriebsmodus
-    state:
-    - Heating
+  conditions: []
   actions:
   - delay:
       hours: 0
@@ -591,11 +579,7 @@
     entity_id:
     - climate.thermostatschlafzimmer
     attribute: temperature
-  conditions:
-  - condition: state
-    entity_id: sensor.heizungsbetriebsmodus
-    state:
-    - Heating
+  conditions: []
   actions:
   - delay:
       hours: 0

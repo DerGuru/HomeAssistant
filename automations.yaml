@@ -1,0 +1,1273 @@
+- id: '1733651303046'
+  alias: Esstisch
+  description: Nimmt den Schalter von Fritz und schaltet Bool um, der an HomeKit geht
+  triggers:
+  - trigger: webhook
+    allowed_methods:
+    - POST
+    - PUT
+    - GET
+    local_only: true
+    webhook_id: esstisch
+  conditions: []
+  actions:
+  - action: light.toggle
+    metadata: {}
+    data: {}
+    target:
+      entity_id: light.esstisch
+  mode: queued
+  max: 10
+- id: '1736946120721'
+  alias: Büro OG Fenster auf bei offener Tür unter 15C
+  description: Das Fenster in Julias Büro wird geöffnet, während es draussen kalt
+    ist. Sie lässt dabei gerne mal die Tür offen und es wird im ganzen Haus kalt.
+  triggers:
+  - type: opened
+    device_id: 3ccc140b0636a9ce097785820311feb7
+    entity_id: 3a0a88e9c19b7989f7ea39480a7fb106
+    domain: binary_sensor
+    trigger: device
+  - type: opened
+    device_id: 18d445d1153b501d921614deb9c1a922
+    entity_id: 20f7df1c21b7e0b039e89eb50640616b
+    domain: binary_sensor
+    trigger: device
+  conditions:
+  - condition: numeric_state
+    entity_id: sensor.heizung_aussentemp
+    below: 15
+    enabled: false
+  actions:
+  - delay:
+      hours: 0
+      minutes: 5
+      seconds: 0
+      milliseconds: 0
+  - alias: Fenster auf heißt Tür zu!
+    repeat:
+      while:
+      - condition: and
+        conditions:
+        - type: is_open
+          condition: device
+          device_id: 3ccc140b0636a9ce097785820311feb7
+          entity_id: 3a0a88e9c19b7989f7ea39480a7fb106
+          domain: binary_sensor
+        - type: is_open
+          condition: device
+          device_id: 18d445d1153b501d921614deb9c1a922
+          entity_id: 20f7df1c21b7e0b039e89eb50640616b
+          domain: binary_sensor
+      sequence:
+      - action: script.tts_with_volume
+        metadata: {}
+        data:
+          target_volume: 0.8
+          target_device: 967db56538466d8a21b62255d71f806d
+          msg: Fenster auf heißt Tür zu!
+        alias: Fenster auf heißt Tür zu!
+        enabled: true
+      - delay:
+          hours: 0
+          minutes: 0
+          seconds: 30
+          milliseconds: 0
+    enabled: false
+  - if:
+    - condition: and
+      conditions:
+      - type: is_open
+        condition: device
+        device_id: 3ccc140b0636a9ce097785820311feb7
+        entity_id: 3a0a88e9c19b7989f7ea39480a7fb106
+        domain: binary_sensor
+      - type: is_open
+        condition: device
+        device_id: 18d445d1153b501d921614deb9c1a922
+        entity_id: 20f7df1c21b7e0b039e89eb50640616b
+        domain: binary_sensor
+    then:
+    - action: notify.mobile_app_aphone
+      metadata: {}
+      data:
+        message: Fenster und Tür auf bei Julias Büro.
+  mode: restart
+- id: '1745942630614'
+  alias: Rasensprengen
+  description: ''
+  triggers:
+  - event: sunrise
+    offset: -04:00:00
+    trigger: sun
+  conditions:
+  - condition: numeric_state
+    entity_id: sensor.rasenfeuchte_soil_moisture
+    below: 40
+  actions:
+  - action: script.rasensprengen_2
+    data: {}
+  - delay:
+      hours: 2
+      minutes: 30
+      seconds: 0
+      milliseconds: 0
+  mode: single
+- id: '1746883566367'
+  alias: Fenster offen beim abschließen
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_boolean.binda
+    to:
+    - 'off'
+  conditions:
+  - condition: state
+    entity_id: binary_sensor.fenster
+    state:
+    - 'on'
+  actions:
+  - device_id: 45e0696309df0c4783c5d575b9adbd27
+    domain: mobile_app
+    type: notify
+    message: '{{ fenster_msg }}'
+    title: Fenster offen!
+  - action: script.tts_with_volume
+    metadata: {}
+    data:
+      target_volume: 1
+      msg: Offene Fenster {{ fenster_msg }}
+      target_device: 2bcd073e7826d5b9ad641dcd745812a5
+  variables:
+    fenster_msg: "{% set offene = expand('binary_sensor.fenster')\n  | selectattr('state',
+      'eq', 'on')\n  | map(attribute='name')\n  | list\n  | join(',\\n ') %}\n{{ offene
+      }}"
+  mode: single
+- id: '1758874618690'
+  alias: SaugenEG
+  description: Vaccum the ground floor
+  triggers:
+  - trigger: webhook
+    allowed_methods:
+    - POST
+    - PUT
+    - GET
+    - HEAD
+    local_only: true
+    webhook_id: SaugenEG
+  conditions: []
+  actions:
+  - device_id: b4da93f1fc51f440503da44a8d29164e
+    domain: button
+    entity_id: eb1caebb1a2653d59c7fa824281cff04
+    type: press
+  mode: single
+- id: '1758884336016'
+  alias: Roborock Return To Base
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_boolean.roborock_abbrechen
+    to: 'on'
+  conditions: []
+  actions:
+  - device_id: b4da93f1fc51f440503da44a8d29164e
+    domain: vacuum
+    entity_id: 7b7318b2260142b0389242a8ee121aa7
+    type: dock
+  - action: input_boolean.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: input_boolean.roborock_abbrechen
+  mode: single
+- id: '1758906112942'
+  alias: BüroEG Arbeitslicht An
+  description: ''
+  triggers:
+  - type: occupied
+    device_id: 41d611a267910aa270125643e62bf544
+    entity_id: cccc9b16739cdf8a2bec4da255da3462
+    domain: binary_sensor
+    trigger: device
+  conditions: []
+  actions:
+  - action: light.turn_on
+    metadata: {}
+    target:
+      entity_id:
+      - light.ikea_of_sweden_tradfri_bulb_e14_ws_candle_470lm
+      - light.schreibtischlampe
+    data: {}
+  mode: parallel
+  max: 10
+- id: '1758906217471'
+  alias: BüroEG Arbeitslicht Aus
+  description: ''
+  triggers:
+  - type: not_occupied
+    device_id: 41d611a267910aa270125643e62bf544
+    entity_id: cccc9b16739cdf8a2bec4da255da3462
+    domain: binary_sensor
+    trigger: device
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 10
+  conditions: []
+  actions:
+  - action: light.turn_off
+    metadata: {}
+    target:
+      area_id: arbeitszimmer
+    data: {}
+  mode: single
+- id: '1762360814601'
+  alias: Bad OG
+  description: Öffnet bei Heizen, schließt bei Kühlen. Loggt Entscheidungen.
+  triggers:
+  - entity_id:
+    - sensor.heizungsbetriebsmodus
+    trigger: state
+  - event: start
+    trigger: homeassistant
+  - entity_id: switch.heizkreisbadog
+    trigger: state
+  actions:
+  - variables:
+      ventil: switch.heizkreisbadog
+      kuehl: '{{ is_state(''sensor.heizungsbetriebsmodus'',''Cooling'') }}'
+      ziel_an: '{{ not kuehl }}'
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ ziel_an }}'
+      sequence:
+      - condition: template
+        value_template: '{{ is_state(ventil, ''off'') }}'
+      - target:
+          entity_id: '{{ ventil }}'
+        action: switch.turn_on
+        data: {}
+      - data:
+          name: HK Bad
+          message: Auf (kuehl={{ kuehl }}, ziel_an={{ ziel_an }})
+        action: logbook.log
+    - conditions:
+      - condition: template
+        value_template: '{{ not ziel_an }}'
+      sequence:
+      - condition: template
+        value_template: '{{ is_state(ventil, ''on'') }}'
+      - target:
+          entity_id: '{{ ventil }}'
+        action: switch.turn_off
+      - data:
+          name: HK Bad
+          message: Zu (kuehl={{ kuehl }}, ziel_an={{ ziel_an }})
+        action: logbook.log
+    default: []
+  mode: restart
+- id: '1764488924818'
+  alias: Standardbeleuchtung
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.esisthell
+    to:
+  - trigger: state
+    entity_id:
+    - input_boolean.binda
+    to:
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: input_boolean.binda
+        state:
+        - 'on'
+      - condition: state
+        entity_id: binary_sensor.esisthell
+        state:
+        - 'off'
+      sequence:
+      - action: light.turn_on
+        metadata: {}
+        data: {}
+        target:
+          entity_id: light.standardbeleuchtung
+    - conditions:
+      - condition: state
+        entity_id: input_boolean.binda
+        state:
+        - 'off'
+      sequence:
+      - action: light.turn_off
+        metadata: {}
+        data: {}
+        target:
+          entity_id: light.standardbeleuchtung
+  mode: queued
+  max: 10
+- id: '1764586858424'
+  alias: Reset goCoax auf dem Dachboden
+  description: Das goCoax auf dem Dachboden spinnt manchmal. Weil es aber der Zentrale
+    Nexus ist und aber schwer erreichbar, hier die Fernsteuerung direkt über die FB
+    und DECT.
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_boolean.coaxreset
+    to:
+    - 'on'
+  conditions: []
+  actions:
+  - type: turn_off
+    device_id: 591a14d632e3c9d1d8b0b4961030c3ea
+    entity_id: ec9372a6b4929e4a74391b5d61e328e5
+    domain: switch
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 5
+      milliseconds: 0
+  - type: turn_on
+    device_id: 591a14d632e3c9d1d8b0b4961030c3ea
+    entity_id: ec9372a6b4929e4a74391b5d61e328e5
+    domain: switch
+  - action: input_boolean.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: input_boolean.coaxreset
+  mode: single
+- id: '1764927919270'
+  alias: Zitrone gießen
+  description: ''
+  triggers:
+  - type: humidity
+    device_id: edfbeabe067270f5063826e596a2885c
+    entity_id: 0174ff7e47b6496f552270205169a5a3
+    domain: sensor
+    trigger: device
+    below: 40
+  conditions:
+  - type: is_humidity
+    condition: device
+    device_id: edfbeabe067270f5063826e596a2885c
+    entity_id: 0174ff7e47b6496f552270205169a5a3
+    domain: sensor
+    above: 0
+  actions:
+  - action: script.tts_with_volume
+    metadata: {}
+    data:
+      target_volume: 0.8
+      msg: Die Zitrone hat durst.
+      target_device: 2bcd073e7826d5b9ad641dcd745812a5
+  mode: restart
+- id: '1767196469361'
+  alias: Flurlicht
+  description: ''
+  triggers:
+  - trigger: webhook
+    allowed_methods:
+    - PUT
+    - GET
+    - POST
+    - HEAD
+    local_only: true
+    webhook_id: Flurlicht
+  conditions: []
+  actions:
+  - action: light.toggle
+    metadata: {}
+    target:
+      entity_id: light.flurlicht
+    data: {}
+  mode: single
+- id: '1768231508219'
+  alias: Arbeitszimmer EG
+  description: ''
+  triggers:
+  - trigger: homeassistant
+    event: start
+  - trigger: state
+    entity_id:
+    - binary_sensor.bthome_sensor_e4e2_window
+  - trigger: state
+    entity_id:
+    - climate.thermostatburoeg
+    attribute: temperature
+  conditions:
+  - condition: state
+    entity_id: sensor.heizungsbetriebsmodus
+    state:
+    - Heating
+  actions:
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 0
+      milliseconds: 300
+  - action: script.heizkreisventilsteuerung
+    metadata: {}
+    data:
+      zbmini_entity: switch.heizkreisbueroeg
+  mode: queued
+  max: 10
+- id: '1770570182202'
+  alias: Schlafzimmerlicht Sync
+  description: SONOFF Switch <-> IKEA Tradfri Lampe synchron halten
+  triggers:
+  - entity_id: switch.lichtschalter_schlafzimmer
+    trigger: state
+  - entity_id: light.schlafzimmer_deckenlampe
+    trigger: state
+  conditions:
+  - condition: template
+    value_template: '{{ trigger.to_state.state in [''on'',''off''] }}'
+  actions:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.entity_id == ''switch.lichtschalter_schlafzimmer''
+          }}'
+      - condition: template
+        value_template: '{{ states(''light.schlafzimmer_deckenlampe'') != states(''switch.lichtschalter_schlafzimmer'')
+          }}
+
+          '
+      sequence:
+      - target:
+          entity_id: light.schlafzimmer_deckenlampe
+        action: light.turn_{{ states('switch.lichtschalter_schlafzimmer') }}
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.entity_id == ''light.schlafzimmer_deckenlampe''
+          }}'
+      - condition: template
+        value_template: '{{ states(''switch.lichtschalter_schlafzimmer'') != states(''light.schlafzimmer_deckenlampe'')
+          }}
+
+          '
+      sequence:
+      - target:
+          entity_id: switch.lichtschalter_schlafzimmer
+        action: switch.turn_{{ states('light.schlafzimmer_deckenlampe') }}
+  mode: single
+- id: '1770643744092'
+  alias: HeizenKuehlenUmschalten
+  description: Schaltet zwischen Heizen und Kühlen hin und her. Synchronsiert die
+    Ventilsteuerungen
+  triggers:
+  - entity_id: sensor.heizungsbetriebsmodus
+    trigger: state
+  actions:
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 0
+      milliseconds: 300
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: sensor.heizungsbetriebsmodus
+        state: Cooling
+      sequence:
+      - target:
+          entity_id: switch.heizkreisbadog
+        action: switch.turn_off
+    default:
+    - target:
+        entity_id: switch.heizkreisbadog
+      action: switch.turn_on
+  - action: script.setheizkreisventilebetriebsmodus
+    data: {}
+  mode: queued
+  max: 10
+- id: '1770711749841'
+  alias: BueroEGLicht
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.arbeitszimmer_eg_lichtschalter_az_eg_opening_1
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: binary_sensor.arbeitszimmer_eg_lichtschalter_az_eg_opening_1
+        state:
+        - 'off'
+      sequence:
+      - action: light.turn_on
+        metadata: {}
+        target:
+          entity_id: light.burodeckenlicht
+        data: {}
+    default:
+    - action: light.turn_off
+      metadata: {}
+      target:
+        entity_id: light.burodeckenlicht
+      data: {}
+  mode: single
+- id: '1770818746119'
+  alias: Arbeitszimmer OG
+  description: ''
+  triggers:
+  - trigger: homeassistant
+    event: start
+  - trigger: state
+    entity_id:
+    - binary_sensor.bthome_sensor_ab88_window
+  - trigger: state
+    entity_id:
+    - climate.thermostatburoog
+    attribute: temperature
+  conditions:
+  - condition: state
+    entity_id: sensor.heizungsbetriebsmodus
+    state:
+    - Heating
+  actions:
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 0
+      milliseconds: 300
+  - action: script.heizkreisventilsteuerung
+    metadata: {}
+    data:
+      zbmini_entity: switch.heizkreisburoog
+  mode: queued
+  max: 10
+- id: '1770818884361'
+  alias: Kinderzimmer
+  description: ''
+  triggers:
+  - trigger: homeassistant
+    event: start
+  - trigger: state
+    entity_id:
+    - binary_sensor.kinderzimmer_fenster
+  - trigger: state
+    entity_id:
+    - climate.thermostatkinderzimmer
+    attribute: temperature
+  conditions:
+  - condition: state
+    entity_id: sensor.heizungsbetriebsmodus
+    state:
+    - Heating
+  actions:
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 0
+      milliseconds: 300
+  - action: script.heizkreisventilsteuerung
+    metadata: {}
+    data:
+      zbmini_entity: switch.heizkreiskinderzimmer
+  mode: queued
+  max: 10
+- id: '1770818953369'
+  alias: Schlafzimmer
+  description: ''
+  triggers:
+  - trigger: homeassistant
+    event: start
+  - trigger: state
+    entity_id:
+    - binary_sensor.schlafzimmerfenster_window
+  - trigger: state
+    entity_id:
+    - climate.thermostatschlafzimmer
+    attribute: temperature
+  conditions:
+  - condition: state
+    entity_id: sensor.heizungsbetriebsmodus
+    state:
+    - Heating
+  actions:
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 0
+      milliseconds: 300
+  - action: script.heizkreisventilsteuerung
+    metadata: {}
+    data:
+      zbmini_entity: switch.heizkreisschlafzimmer
+  mode: queued
+  max: 10
+- id: '1772186038644'
+  alias: HaStartSync
+  description: HA Start Heizungsteuerung setzt initialen State
+  triggers:
+  - event: start
+    trigger: homeassistant
+  conditions: []
+  actions:
+  - wait_template: "{{\n  states('sensor.vorlauf_heizkreis') not in ['unknown','unavailable','']\n
+      \ and states('sensor.rucklauf_heizkreis') not in ['unknown','unavailable','']\n
+      \ and states('switch.heizkreisbadog') not in ['unknown','unavailable','']\n
+      \ and states('switch.heizkreisbueroeg') not in ['unknown','unavailable','']\n
+      \ and states('switch.heizkreisburoog') not in ['unknown','unavailable','']\n
+      \ and states('switch.heizkreiskinderzimmer') not in ['unknown','unavailable','']\n
+      \ and states('switch.heizkreisschlafzimmer') not in ['unknown','unavailable','']\n}}"
+    timeout: 00:15:00
+    continue_on_timeout: true
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ wait.completed }}'
+      sequence:
+      - data:
+          level: warning
+          message: 'StartCheck OK: Heizkreis-Entities sind verfügbar. Modus={{ states(''sensor.heizungsbetriebsmodus'')
+            }}'
+        action: system_log.write
+    default:
+    - data:
+        level: error
+        message: 'StartCheck TIMEOUT: Heizkreis-Entities nicht vollständig verfügbar.'
+      action: system_log.write
+    - stop: HaStartSync abgebrochen wegen Timeout
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: sensor.heizungsbetriebsmodus
+        state: Cooling
+      sequence:
+      - target:
+          entity_id: switch.heizkreisbadog
+        action: switch.turn_off
+    default:
+    - target:
+        entity_id: switch.heizkreisbadog
+      action: switch.turn_on
+  - action: script.setheizkreisventilebetriebsmodus
+    data: {}
+  mode: single
+- id: '1773570622666'
+  alias: Anker Set L Target
+  description: ''
+  triggers:
+  - trigger: numeric_state
+    entity_id:
+    - sensor.l_target_difference
+    above: 29
+  - trigger: numeric_state
+    entity_id:
+    - sensor.l_target_difference
+    below: 0
+  - trigger: numeric_state
+    entity_id:
+    - sensor.l_target
+    below: 100
+  - trigger: numeric_state
+    entity_id:
+    - sensor.l_target
+    above: 99
+  conditions:
+  - condition: not
+    conditions:
+    - condition: state
+      entity_id: number.l_solarbank_e1600_system_output_preset
+      state:
+      - unavailable
+  actions:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: switch.l_solarbank_e1600_allow_power_export
+        state:
+        - 'off'
+      - condition: numeric_state
+        entity_id: sensor.l_target
+        above: 99
+      sequence:
+      - action: switch.turn_on
+        metadata: {}
+        target:
+          entity_id: switch.l_solarbank_e1600_allow_power_export
+        data: {}
+      - action: number.set_value
+        target:
+          entity_id: number.l_solarbank_e1600_system_output_preset
+        data:
+          value: '{{ states(''sensor.l_target'') | int }}'
+    - conditions:
+      - condition: state
+        entity_id: switch.l_solarbank_e1600_allow_power_export
+        state:
+        - 'on'
+      - condition: numeric_state
+        entity_id: sensor.l_target
+        above: 99
+      sequence:
+      - action: number.set_value
+        target:
+          entity_id: number.l_solarbank_e1600_system_output_preset
+        data:
+          value: '{{ states(''sensor.l_target'') | int }}'
+    - conditions:
+      - condition: state
+        entity_id: switch.l_solarbank_e1600_allow_power_export
+        state:
+        - 'on'
+      - condition: numeric_state
+        entity_id: sensor.l_target
+        below: 100
+      sequence:
+      - action: switch.turn_off
+        metadata: {}
+        target:
+          entity_id: switch.l_solarbank_e1600_allow_power_export
+        data: {}
+  mode: queued
+  max: 10
+- id: '1773570832709'
+  alias: Anker Set R Target
+  description: ''
+  triggers:
+  - trigger: numeric_state
+    entity_id:
+    - sensor.r_target_difference
+    above: 29
+  - trigger: numeric_state
+    entity_id:
+    - sensor.r_target_difference
+    below: 0
+  - trigger: numeric_state
+    entity_id:
+    - sensor.r_target
+    below: 100
+  - trigger: numeric_state
+    entity_id:
+    - sensor.r_target
+    above: 99
+  conditions:
+  - condition: not
+    conditions:
+    - condition: state
+      entity_id: number.r_solarbank_e1600_system_output_preset
+      state:
+      - unavailable
+  actions:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: switch.r_solarbank_e1600_allow_power_export
+        state:
+        - 'off'
+      - condition: numeric_state
+        entity_id: sensor.r_target
+        above: 99
+      sequence:
+      - action: switch.turn_on
+        metadata: {}
+        target:
+          entity_id: switch.r_solarbank_e1600_allow_power_export
+        data: {}
+      - action: number.set_value
+        target:
+          entity_id: number.r_solarbank_e1600_system_output_preset
+        data:
+          value: '{{ states(''sensor.r_target'') | int }}'
+    - conditions:
+      - condition: state
+        entity_id: switch.r_solarbank_e1600_allow_power_export
+        state:
+        - 'on'
+      - condition: numeric_state
+        entity_id: sensor.r_target
+        above: 99
+      sequence:
+      - action: number.set_value
+        target:
+          entity_id: number.r_solarbank_e1600_system_output_preset
+        data:
+          value: '{{ states(''sensor.r_target'') | int }}'
+    - conditions:
+      - condition: state
+        entity_id: switch.r_solarbank_e1600_allow_power_export
+        state:
+        - 'on'
+      - condition: numeric_state
+        entity_id: sensor.r_target
+        below: 100
+      sequence:
+      - action: switch.turn_off
+        metadata: {}
+        target:
+          entity_id: switch.r_solarbank_e1600_allow_power_export
+        data: {}
+  mode: queued
+  max: 10
+- id: '1775061527011'
+  alias: Heizung - Terrassentür offen -> Warmwasser
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id: binary_sensor.terassentur
+    to: 'on'
+  - trigger: state
+    entity_id:
+    - sensor.heizungsbetriebsmodus
+    from: Cooling
+    to: Heating
+  - trigger: state
+    entity_id:
+    - select.heizung_programmschalter
+  conditions:
+  - condition: state
+    entity_id: sensor.heizungsbetriebsmodus
+    state: Heating
+  - condition: state
+    entity_id: binary_sensor.terassentur
+    state: 'on'
+  - condition: state
+    entity_id: select.heizung_programmschalter
+    state: Programm
+  actions:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: binary_sensor.heizung_verdichter
+        state: 'off'
+      sequence:
+      - action: select.select_option
+        target:
+          entity_id: select.heizung_programmschalter
+        data:
+          option: Warmwasser
+      - delay:
+          hours: 0
+          minutes: 0
+          seconds: 30
+          milliseconds: 0
+        enabled: false
+    - conditions:
+      - condition: state
+        entity_id: binary_sensor.heizung_verdichter
+        state: 'on'
+      sequence:
+      - wait_for_trigger:
+        - trigger: state
+          entity_id: binary_sensor.heizung_verdichter
+          to: 'off'
+        - trigger: state
+          entity_id: binary_sensor.terassentur
+          to: 'off'
+        timeout: 00:15:00
+        continue_on_timeout: false
+      - condition: state
+        entity_id: binary_sensor.terassentur
+        state: 'on'
+      - condition: state
+        entity_id: select.heizung_programmschalter
+        state: Programm
+      - action: select.select_option
+        target:
+          entity_id: select.heizung_programmschalter
+        data:
+          option: Warmwasser
+  mode: restart
+- id: '1775119620638'
+  alias: Heizung - Terrassentür geschlossen -> Programm
+  description: Wenn die Terassentür geschlossen wird oder die Heizung in den Kühlmodus
+    geht, dann wird der Warmwassermodus, der sonst im Heizmodus aktiv ist zum Programmmodus
+  triggers:
+  - trigger: state
+    entity_id: binary_sensor.terassentur
+    to: 'off'
+  - trigger: state
+    entity_id: sensor.heizungsbetriebsmodus
+    from: Heating
+    to: Cooling
+  conditions:
+  - condition: state
+    entity_id: select.heizung_programmschalter
+    state: Warmwasser
+  actions:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: sensor.heizungsbetriebsmodus
+        state:
+        - Heating
+      - condition: numeric_state
+        entity_id: sensor.heizung_aussentemp
+        above: 22
+      sequence:
+      - action: select.select_option
+        target:
+          entity_id: select.heizung_programmschalter
+        data:
+          option: Warmwasser
+    default:
+    - action: select.select_option
+      target:
+        entity_id: select.heizung_programmschalter
+      data:
+        option: Programm
+  mode: queued
+  max: 10
+- id: '1776798325469'
+  alias: Schlafzimmer
+  description: ''
+  triggers:
+  - device_id: 7c7e75c097737e9fa0eacf4e2d76bf4a
+    domain: zha
+    type: remote_button_short_press
+    subtype: turn_on
+    trigger: device
+  conditions: []
+  actions:
+  - action: light.toggle
+    metadata: {}
+    target:
+      device_id: 8b5e98bf2936f528adb7da5db323a46a
+    data: {}
+  mode: single
+- id: '1777968583797'
+  alias: HeizungsBoost
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_button.heizboost
+  conditions: []
+  actions:
+  - device_id: 8da1bc7d57cca3e2db2f7b8e9575f52f
+    domain: number
+    entity_id: eafe330a3b7d4caec562f7d90db9d101
+    type: set_value
+    value: 1.5
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 5
+      milliseconds: 0
+  - wait_template: '{{ states(''sensor.heizung_ruecklaufisttemp'') | float(0) >= states(''sensor.heizung_ruecklaufsolltemp'')
+      | float(0) }}'
+    continue_on_timeout: true
+    timeout:
+      hours: 2
+      minutes: 0
+      seconds: 0
+      milliseconds: 0
+  - device_id: 8da1bc7d57cca3e2db2f7b8e9575f52f
+    domain: number
+    entity_id: eafe330a3b7d4caec562f7d90db9d101
+    type: set_value
+    value: 0.35
+  mode: restart
+- id: '1777981579998'
+  alias: Gartenpumpe Toggle
+  description: ''
+  triggers:
+  - trigger: event
+    event_type: zha_event
+    event_data:
+      device_ieee: f8:44:77:ff:fe:43:80:34
+      command: toggle
+  conditions: []
+  actions:
+  - action: switch.toggle
+    target:
+      entity_id: switch.gartenpumpe_sprengerumshaus_switch
+    enabled: true
+    data: {}
+  mode: single
+- id: '1779097838351'
+  alias: Ding Dong
+  description: ''
+  triggers:
+  - trigger: event
+    event_type: zha_event
+    event_data:
+      device_ieee: f8:44:77:ff:fe:1e:0e:ac
+      command: toggle
+  conditions: []
+  actions:
+  - parallel:
+    - action: script.playmedia
+      metadata: {}
+      data:
+        target_volume: 0.8
+        path: dingdong.mp3
+        target_device: 967db56538466d8a21b62255d71f806d
+    - action: script.playmedia
+      metadata: {}
+      data:
+        target_volume: 0.8
+        path: dingdong.mp3
+        target_device: 2bcd073e7826d5b9ad641dcd745812a5
+  mode: parallel
+  max: 10
+- id: '1779792424456'
+  alias: BeeteSprengen
+  description: ''
+  triggers:
+  - trigger: numeric_state
+    entity_id:
+    - sensor.hochbeet_soil_moisture
+    below: 40
+    above: 1
+  - trigger: numeric_state
+    entity_id:
+    - sensor.rosenvordemhaus_soil_moisture
+    below: 40
+    above: 1
+  - trigger: sun
+    event: sunrise
+    offset: -01:00:00
+  conditions:
+  - condition: or
+    conditions:
+    - condition: numeric_state
+      entity_id: sensor.hochbeet_soil_moisture
+      above: 1
+      below: 40
+    - condition: numeric_state
+      entity_id: sensor.rosenvordemhaus_soil_moisture
+      above: 1
+      below: 40
+  actions:
+  - action: script.beetesprengen
+    data: {}
+  - delay:
+      hours: 2
+      minutes: 30
+      seconds: 0
+      milliseconds: 0
+  mode: single
+- id: '1779792917176'
+  alias: Gartenpumpe an
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - valve.gartenventile
+    to:
+    - open
+  conditions: []
+  actions:
+  - if:
+    - condition: numeric_state
+      entity_id: sensor.carport_power
+      above: 8000
+    then:
+    - wait_for_trigger:
+      - trigger: numeric_state
+        entity_id:
+        - sensor.carport_power
+        below: 8000
+  - action: valve.open_valve
+    metadata: {}
+    target:
+      entity_id: valve.gartenpumpe_sprengerumshaus_switch
+    data: {}
+  mode: single
+- id: '1779792980507'
+  alias: Gartenpumpe aus
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - valve.gartenventile
+    to:
+    - closed
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 0
+  - trigger: numeric_state
+    entity_id:
+    - sensor.carport_power
+    above: 8000
+  conditions: []
+  actions:
+  - action: valve.close_valve
+    metadata: {}
+    target:
+      entity_id: valve.gartenpumpe_sprengerumshaus_switch
+    data: {}
+  mode: restart
+- id: '1779794092082'
+  alias: Wäscheplatz
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunrise
+    offset: -04:00:00
+  conditions:
+  - condition: numeric_state
+    entity_id: sensor.rasenfeuchte_soil_moisture
+    above: 1
+    below: 40
+  actions:
+  - action: script.bewasserung_kreis_ausfuhren
+    data:
+      ventil: valve.sprenger4_hochbeet_sprenger4_hochbeet
+      dauer_minuten: 20
+  - delay:
+      hours: 2
+      minutes: 30
+      seconds: 0
+      milliseconds: 0
+  mode: single
+- id: '1779794458375'
+  alias: FliederUndHecke
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunrise
+    offset: -04:00:00
+  conditions:
+  - condition: numeric_state
+    entity_id: sensor.flieder_soil_moisture
+    above: 1
+    below: 40
+  actions:
+  - action: script.beetesprengen_duplicate
+    data: {}
+  - delay:
+      hours: 2
+      minutes: 30
+      seconds: 0
+      milliseconds: 0
+  mode: single
+- id: '1781081894269'
+  alias: Warm macht nur Warmwasser, wenn nicht gekühlt wird.
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.heizungsbetriebsmodus
+  - trigger: numeric_state
+    entity_id:
+    - sensor.heizung_aussentemp
+    above: 22
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: sensor.heizungsbetriebsmodus
+        state:
+        - Heating
+      sequence:
+      - action: select.select_option
+        metadata: {}
+        target:
+          entity_id: select.heizung_programmschalter
+        data:
+          option: Warmwasser
+    - conditions:
+      - condition: state
+        entity_id: sensor.heizungsbetriebsmodus
+        state:
+        - Cooling
+      sequence:
+      - action: select.select_option
+        metadata: {}
+        target:
+          entity_id: select.heizung_programmschalter
+        data:
+          option: Programm
+  mode: single
+- id: '1781081971592'
+  alias: Kühl schaltet die Heizkreise ein
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.heizungsbetriebsmodus
+  - trigger: numeric_state
+    entity_id:
+    - sensor.heizung_aussentemp
+    below: 21
+  conditions: []
+  actions:
+  - action: select.select_option
+    metadata: {}
+    target:
+      entity_id: select.heizung_programmschalter
+    data:
+      option: Programm
+  mode: single
+- id: '1781456750441'
+  alias: BüroEG Billy
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.arbeitszimmer_eg_lichtschalter_az_eg_opening_2
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: binary_sensor.arbeitszimmer_eg_lichtschalter_az_eg_opening_2
+        state:
+        - 'off'
+      sequence:
+      - action: light.turn_on
+        metadata: {}
+        data: {}
+        target:
+          entity_id:
+          - light.arbeitszimmer_eg_billy
+          - light.arbeitszimmer_eg_jetstrom
+    default:
+    - action: light.turn_off
+      metadata: {}
+      data: {}
+      target:
+        entity_id:
+        - light.arbeitszimmer_eg_billy
+        - light.arbeitszimmer_eg_jetstrom
+  mode: single
+- id: '1781790965082'
+  alias: Abends Fensterwarnung
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - light.standardbeleuchtung
+    from:
+    - 'on'
+    to:
+    - 'off'
+  conditions:
+  - condition: state
+    entity_id: binary_sensor.fenster
+    state:
+    - 'on'
+  - condition: state
+    entity_id: binary_sensor.esisthell
+    state:
+    - 'off'
+  actions:
+  - action: script.tts_with_volume
+    metadata: {}
+    data:
+      target_volume: 1
+      msg: Offene Fenster {{ fenster_msg }}
+      target_device: 2bcd073e7826d5b9ad641dcd745812a5
+  mode: single
+  variables:
+    fenster_msg: "{% set offene = expand('binary_sensor.fenster')\n  | selectattr('state',
+      'eq', 'on')\n  | map(attribute='name')\n  | list\n  | join(',\\n ') %}\n{{ offene
+      }}"

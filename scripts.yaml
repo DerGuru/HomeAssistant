@@ -1,0 +1,311 @@
+tts_with_volume:
+  alias: TTS_with_Volume
+  description: Speichert die aktuelle Lautstärke, erhöht sie, gibt aus und setzt auf
+    Original zurück
+  mode: queued
+  max: 100
+  fields:
+    msg:
+      selector:
+        text:
+      name: Nachricht
+      required: true
+    target_device:
+      name: Zielgerät (HomePod)
+      description: Wähle das HomePod-Device
+      selector:
+        device:
+          multiple: false
+      required: true
+    target_volume:
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.05
+      default: 0.8
+  sequence:
+  - variables:
+      mp_entity: "{% set entities = device_entities(target_device)\n   | select('match',
+        '^media_player\\.')\n   | list %}\n{{ entities[0] if entities|length > 0 else
+        '' }}\n"
+  - condition: template
+    value_template: '{{ mp_entity != '''' }}'
+  - variables:
+      initial_volume: '{{ state_attr(mp_entity, ''volume_level'') | float(0.4) }}'
+  - target:
+      entity_id: '{{ mp_entity }}'
+    data:
+      volume_level: '{{ target_volume }}'
+    action: media_player.volume_set
+  - action: tts.speak
+    metadata: {}
+    data:
+      cache: true
+      media_player_entity_id: '{{ mp_entity }}'
+      message: '{{ msg }}'
+    target:
+      entity_id: tts.google_translate_de_de
+  - wait_template: '{{ not is_state(mp_entity, ''playing'') }}'
+    timeout: 00:02:00
+    continue_on_timeout: true
+  - target:
+      entity_id: '{{ mp_entity }}'
+    data:
+      volume_level: '{{ initial_volume }}'
+    action: media_player.volume_set
+heizkreisventilsteuerung:
+  alias: HeizkreisVentilSteuerung
+  mode: queued
+  max: 32
+  fields:
+    zbmini_entity:
+      description: Der SONOFF ZBMINIR2 im Raum mit einem Thermostat, der das Heizkreisventil
+        steuert
+  variables:
+    area: '{{ area_id(zbmini_entity) }}'
+    heating: '{{ is_state(''sensor.heizungsbetriebsmodus'', ''Heating'') }}'
+    any_window_open: "{{\n  expand(area_entities(area))\n  | selectattr('domain','eq','binary_sensor')\n
+      \ | selectattr('attributes.device_class','eq','window')\n  | selectattr('state','eq','on')\n
+      \ | list | length > 0\n}}"
+    thermostat: "{{\n  expand(area_entities(area))\n  | selectattr('domain','eq','climate')\n
+      \ | map(attribute='entity_id')\n  | list | first\n}}"
+  sequence:
+  - condition: template
+    value_template: '{{ heating }}'
+  - condition: template
+    value_template: '{{ area is not none }}'
+  - condition: template
+    value_template: '{{ thermostat is not none }}'
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ any_window_open }}'
+      sequence:
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: '{{ thermostat }}'
+        data:
+          hvac_mode: 'off'
+    - conditions:
+      - condition: template
+        value_template: '{{ not any_window_open }}'
+      sequence:
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: '{{ thermostat }}'
+        data:
+          hvac_mode: heat
+playmedia:
+  sequence:
+  - variables:
+      mp_entity: "{% set entities = device_entities(target_device)\n   | select('match',
+        '^media_player\\.')\n   | list %}\n{{ entities[0] if entities|length > 0 else
+        '' }}\n"
+  - condition: template
+    value_template: '{{ mp_entity != '''' }}'
+  - variables:
+      initial_volume: '{{ state_attr(mp_entity, ''volume_level'') | float(0.4) }}'
+  - target:
+      entity_id: '{{ mp_entity }}'
+    data:
+      volume_level: '{{ target_volume }}'
+    action: media_player.volume_set
+  - action: media_player.play_media
+    target:
+      entity_id: '{{ mp_entity }}'
+    data:
+      media:
+        media_content_id: '{{ ''media-source://media_source/local/'' ~ path }}'
+        media_content_type: audio/mpeg
+        metadata: {}
+  - wait_template: '{{ not is_state(mp_entity, ''playing'') }}
+
+      '
+    timeout: 00:02:00
+    continue_on_timeout: true
+  - target:
+      entity_id: '{{ mp_entity }}'
+    data:
+      volume_level: '{{ initial_volume }}'
+    action: media_player.volume_set
+  alias: PlayMedia
+  description: Speichert die aktuelle Lautstärke, erhöht sie, gibt aus und setzt auf
+    Original zurück
+  mode: parallel
+  max: 100
+  fields:
+    path:
+      selector:
+        text:
+      name: AudioDatei
+      required: true
+    target_device:
+      name: Zielgerät (HomePod)
+      description: Wähle das HomePod-Device
+      selector:
+        device:
+          multiple: false
+      required: true
+    target_volume:
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.05
+      default: 0.8
+setheizkreisventilebetriebsmodus:
+  alias: SetHeizkreisventileBetriebsmodus
+  description: Setzt Detached und das Relay aller Heizkreisventile, die von einem
+    Thermostat gesteuert werden und evaluiert danach den Fenster-Zustand für einen
+    Sync.
+  mode: queued
+  max: 10
+  variables:
+    ventilSwitches: '{{ expand(''switch.heizkreisventile'') | map(attribute=''entity_id'')
+      | list }}'
+    heating: '{{ not is_state(''sensor.heizungsbetriebsmodus'', ''Cooling'') }}'
+  sequence:
+  - repeat:
+      for_each: '{{ ventilSwitches }}'
+      sequence:
+      - variables:
+          name: '{{ repeat.item.split(''.'')[1] }}'
+          detached: switch.{{ name }}_detach_relay
+          area: '{{ area_id(repeat.item) }}'
+          thermostat: "{{\n  expand(area_entities(area))\n  | selectattr('domain','eq','climate')\n
+            \ | map(attribute='entity_id')\n  | list | first\n}}"
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ heating and is_state(detached, ''on'') }}'
+          sequence:
+          - action: switch.turn_off
+            target:
+              entity_id: '{{ detached }}'
+          - action: switch.turn_off
+            target:
+              entity_id: '{{ repeat.item }}'
+          - action: climate.set_hvac_mode
+            target:
+              entity_id: '{{ thermostat }}'
+            data:
+              hvac_mode: 'off'
+          - action: script.heizkreisventilsteuerung
+            metadata: {}
+            data:
+              zbmini_entity: '{{ repeat.item }}'
+        - conditions:
+          - condition: template
+            value_template: '{{ not heating }}'
+          sequence:
+          - action: switch.turn_on
+            target:
+              entity_id:
+              - '{{ detached }}'
+              - '{{ repeat.item }}'
+            data: {}
+bewasserung_kreis_ausfuhren:
+  alias: Bewässerung Kreis ausführen
+  mode: queued
+  max: 10
+  fields:
+    ventil:
+      required: true
+    dauer_minuten:
+      required: true
+  sequence:
+  - action: valve.open_valve
+    target:
+      entity_id: '{{ ventil }}'
+  - delay:
+      minutes: '{{ dauer_minuten | int }}'
+  - action: valve.close_valve
+    target:
+      entity_id: '{{ ventil }}'
+  description: ''
+legionellenprogramm_warmwasser:
+  alias: Legionellenprogramm Warmwasser
+  description: 'Hebt Warmwasser auf Legionellentemperatur, wartet bis mindestens 61
+    °C erreicht sind, hält 30 Minuten und stellt danach die normalen Werte wieder
+    her.'
+  mode: single
+  variables:
+    LegioTemp: 59
+    LegioHyst: 1
+    DefaultTemp: 46
+    DefaultHyst: 3
+  sequence:
+  - alias: WW-Sollwerte auf Legionellenbetrieb setzen
+    action: number.set_value
+    target:
+      entity_id:
+      - number.heizung_ww_eco_temp
+      - number.heizung_ww_komf_temp
+      - number.heizung_speichersolltemp
+    data:
+      value: '{{ LegioTemp + LegioHyst }}'
+  - alias: WW-Hysterese auf Legionellenbetrieb setzen
+    action: number.set_value
+    target:
+      entity_id: number.heizung_ww_hysterese
+    data:
+      value: '{{ LegioHyst }}'
+  - alias: Maximal 1 Stunde warten bis Speicher mindestens 61 °C erreicht
+    wait_template: '{{ states(''sensor.heizung_speicheristtemp'') | float(-999) >=
+      LegioTemp }}'
+    timeout: 01:00:00
+    continue_on_timeout: true
+  - alias: Nur bei erreichter Temperatur 30 Minuten halten
+    choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ wait.completed }}'
+      sequence:
+      - delay: 00:30:00
+  - alias: WW-Hysterese zurücksetzen
+    action: number.set_value
+    target:
+      entity_id: number.heizung_ww_hysterese
+    data:
+      value: '{{ DefaultHyst }}'
+  - alias: WW-Sollwerte zurücksetzen
+    action: number.set_value
+    target:
+      entity_id:
+      - number.heizung_ww_eco_temp
+      - number.heizung_ww_komf_temp
+      - number.heizung_speichersolltemp
+    data:
+      value: '{{ DefaultTemp }}'
+beetesprengen:
+  sequence:
+  - action: script.bewasserung_kreis_ausfuhren
+    metadata: {}
+    data:
+      ventil: valve.gartenpumpe_sprengerumshaus_switch_2
+      dauer_minuten: 20
+  alias: BeeteSprengen
+  description: ''
+fliederundhecke:
+  sequence:
+  - action: script.bewasserung_kreis_ausfuhren
+    metadata: {}
+    data:
+      ventil: valve.sprenger1_hecke_sprenger1_hecke
+      dauer_minuten: 20
+  alias: FliederUndHecke
+  description: ''
+rasensprengen:
+  sequence:
+  - action: script.bewasserung_kreis_ausfuhren
+    data:
+      ventil: valve.sprenger2_gruenerweg_sprenger2_gruenerweg
+      dauer_minuten: 30
+  - action: script.bewasserung_kreis_ausfuhren
+    data:
+      ventil: valve.sprenger3_veranda_sprenger3_veranda
+      dauer_minuten: 15
+    enabled: false
+  alias: RasenSprengen
+  description: ''

@@ -105,7 +105,7 @@
     entity_id: sensor.rasenfeuchte_soil_moisture
     below: 40
   actions:
-  - action: script.rasensprengen_2
+  - action: script.rasensprengen
     data: {}
   - delay:
       hours: 2
@@ -133,12 +133,6 @@
     type: notify
     message: '{{ fenster_msg }}'
     title: Fenster offen!
-  - action: script.tts_with_volume
-    metadata: {}
-    data:
-      target_volume: 1
-      msg: Offene Fenster {{ fenster_msg }}
-      target_device: 2bcd073e7826d5b9ad641dcd745812a5
   variables:
     fenster_msg: "{% set offene = expand('binary_sensor.fenster')\n  | selectattr('state',
       'eq', 'on')\n  | map(attribute='name')\n  | list\n  | join(',\\n ') %}\n{{ offene
@@ -957,7 +951,7 @@
     value: 0.35
   mode: restart
 - id: '1777981579998'
-  alias: Gartenpumpe Toggle
+  alias: Alle Sprenger nacheinander
   description: ''
   triggers:
   - trigger: event
@@ -967,12 +961,44 @@
       command: toggle
   conditions: []
   actions:
-  - action: switch.toggle
-    target:
-      entity_id: switch.gartenpumpe_sprengerumshaus_switch
-    enabled: true
-    data: {}
-  mode: single
+  - choose:
+    - conditions:
+      - condition: valve.is_open
+        target:
+          entity_id:
+          - valve.gartenpumpe_sprengerumshaus_switch_2
+          - valve.sprenger1_hecke_sprenger1_hecke
+          - valve.sprenger2_gruenerweg_sprenger2_gruenerweg
+          - valve.sprenger3_veranda_sprenger3_veranda
+          - valve.sprenger4_hochbeet_sprenger4_hochbeet
+        options:
+          behavior: any
+          for: 00:00:00
+      sequence:
+      - action: valve.close_valve
+        metadata: {}
+        target:
+          entity_id:
+          - valve.gartenpumpe_sprengerumshaus_switch_2
+          - valve.sprenger1_hecke_sprenger1_hecke
+          - valve.sprenger2_gruenerweg_sprenger2_gruenerweg
+          - valve.sprenger3_veranda_sprenger3_veranda
+          - valve.sprenger4_hochbeet_sprenger4_hochbeet
+        data: {}
+    default:
+    - action: script.fliederundhecke
+      metadata: {}
+      data: {}
+    - action: script.rasensprengen
+      metadata: {}
+      data: {}
+    - action: script.wascheplatz
+      metadata: {}
+      data: {}
+    - action: script.beetesprengen
+      metadata: {}
+      data: {}
+  mode: restart
 - id: '1779097838351'
   alias: Ding Dong
   description: ''
@@ -983,20 +1009,7 @@
       device_ieee: f8:44:77:ff:fe:1e:0e:ac
       command: toggle
   conditions: []
-  actions:
-  - parallel:
-    - action: script.playmedia
-      metadata: {}
-      data:
-        target_volume: 0.8
-        path: dingdong.mp3
-        target_device: 967db56538466d8a21b62255d71f806d
-    - action: script.playmedia
-      metadata: {}
-      data:
-        target_volume: 0.8
-        path: dingdong.mp3
-        target_device: 2bcd073e7826d5b9ad641dcd745812a5
+  actions: []
   mode: parallel
   max: 10
 - id: '1779792424456'
@@ -1101,10 +1114,8 @@
     above: 1
     below: 40
   actions:
-  - action: script.bewasserung_kreis_ausfuhren
-    data:
-      ventil: valve.sprenger4_hochbeet_sprenger4_hochbeet
-      dauer_minuten: 20
+  - action: script.wascheplatz
+    data: {}
   - delay:
       hours: 2
       minutes: 30

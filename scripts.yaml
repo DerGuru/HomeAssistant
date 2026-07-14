@@ -85,8 +85,8 @@ heizkreisventilsteuerung:
           zbmini_entity: '{{ zbmini_entity }}'
 heizkreisventilsteuerung_heating:
   alias: HeizkreisVentilSteuerung Heating
-  description: Steuert das Thermostat eines Heizkreisventils im Heizbetrieb - aus bei
-    offenem Fenster, sonst heizen.
+  description: Steuert das Thermostat eines Heizkreisventils im Heizbetrieb - aus
+    bei offenem Fenster, sonst heizen.
   mode: queued
   max: 32
   fields:
@@ -96,11 +96,8 @@ heizkreisventilsteuerung_heating:
       required: true
   variables:
     area: '{{ area_id(zbmini_entity) }}'
-    thermostat: >-
-      {{ expand(area_entities(area))
-      | selectattr('domain','eq','climate')
-      | map(attribute='entity_id')
-      | list | first }}
+    thermostat: '{{ expand(area_entities(area)) | selectattr(''domain'',''eq'',''climate'')
+      | map(attribute=''entity_id'') | list | first }}'
   sequence:
   - condition: template
     value_template: '{{ area is not none }}'
@@ -137,7 +134,8 @@ heizkreisventilsteuerung_cooling:
   max: 32
   fields:
     zbmini_entity:
-      description: Der SONOFF ZBMINIR2 im Raum, dessen Heizkreis-Relay geschaltet wird
+      description: Der SONOFF ZBMINIR2 im Raum, dessen Heizkreis-Relay geschaltet
+        wird
       required: true
   variables:
     area: '{{ area_id(zbmini_entity) }}'
@@ -150,12 +148,9 @@ heizkreisventilsteuerung_cooling:
     response_variable: window
   - condition: template
     value_template: '{{ window.open }}'
-  - wait_template: >-
-      {{ expand(area_entities(area))
-      | selectattr('domain','eq','binary_sensor')
-      | selectattr('attributes.device_class','eq','window')
-      | selectattr('state','eq','on')
-      | list | length == 0 }}
+  - wait_template: '{{ expand(area_entities(area)) | selectattr(''domain'',''eq'',''binary_sensor'')
+      | selectattr(''attributes.device_class'',''eq'',''window'') | selectattr(''state'',''eq'',''on'')
+      | list | length == 0 }}'
     timeout: 00:05:00
     continue_on_timeout: true
   - condition: template
@@ -165,8 +160,7 @@ heizkreisventilsteuerung_cooling:
       entity_id: '{{ zbmini_entity }}'
 any_window_open:
   alias: AnyWindowOpen
-  description: Prueft, ob in einer Area mindestens ein Fenster geoeffnet ist. Gibt
-    ein Objekt { open: bool } zurueck.
+  description: Prueft, ob in einer Area mindestens ein Fenster geoeffnet ist.
   mode: parallel
   max: 32
   fields:
@@ -175,12 +169,9 @@ any_window_open:
       required: true
   variables:
     result:
-      open: >-
-        {{ expand(area_entities(area))
-        | selectattr('domain','eq','binary_sensor')
-        | selectattr('attributes.device_class','eq','window')
-        | selectattr('state','eq','on')
-        | list | length > 0 }}
+      open: '{{ expand(area_entities(area)) | selectattr(''domain'',''eq'',''binary_sensor'')
+        | selectattr(''attributes.device_class'',''eq'',''window'') | selectattr(''state'',''eq'',''on'')
+        | list | length > 0 }}'
   sequence:
   - stop: Fenster-Status ermittelt
     response_variable: result
@@ -316,9 +307,9 @@ bewasserung_kreis_ausfuhren:
   description: ''
 legionellenprogramm_warmwasser:
   alias: Legionellenprogramm Warmwasser
-  description: 'Hebt Warmwasser auf Legionellentemperatur, wartet bis mindestens 61
+  description: Hebt Warmwasser auf Legionellentemperatur, wartet bis mindestens 61
     °C erreicht sind, hält 30 Minuten und stellt danach die normalen Werte wieder
-    her.'
+    her.
   mode: single
   variables:
     LegioTemp: 59
@@ -383,7 +374,7 @@ fliederundhecke:
     metadata: {}
     data:
       ventil: valve.sprenger1_hecke_sprenger1_hecke
-      dauer_minuten: 20
+      dauer_minuten: 30
   alias: FliederUndHecke
   description: ''
 rasensprengen:
@@ -395,7 +386,16 @@ rasensprengen:
   - action: script.bewasserung_kreis_ausfuhren
     data:
       ventil: valve.sprenger3_veranda_sprenger3_veranda
-      dauer_minuten: 15
-    enabled: false
+      dauer_minuten: 30
+    enabled: true
   alias: RasenSprengen
+  description: ''
+wascheplatz:
+  sequence:
+  - action: script.bewasserung_kreis_ausfuhren
+    metadata: {}
+    data:
+      ventil: vvalve.sprenger4_hochbeet_sprenger4_hochbeet
+      dauer_minuten: 30
+  alias: Wäscheplatz
   description: ''

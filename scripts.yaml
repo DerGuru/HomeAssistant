@@ -128,8 +128,7 @@ heizkreisventilsteuerung_heating:
           hvac_mode: heat
 heizkreisventilsteuerung_cooling:
   alias: HeizkreisVentilSteuerung Cooling
-  description: Schliesst im Kuehlbetrieb den Heizkreis (ZBMINI aus), wenn ein Fenster
-    laenger als 5 Minuten offen steht - als Schimmelschutz.
+  description: Schliesst im Kuehlbetrieb den Heizkreis (ZBMINI aus) - als Schimmelschutz.
   mode: parallel
   max: 32
   fields:
@@ -146,18 +145,20 @@ heizkreisventilsteuerung_cooling:
     data:
       area: '{{ area }}'
     response_variable: window
-  - condition: template
-    value_template: '{{ window.open }}'
-  - wait_template: '{{ expand(area_entities(area)) | selectattr(''domain'',''eq'',''binary_sensor'')
-      | selectattr(''attributes.device_class'',''eq'',''window'') | selectattr(''state'',''eq'',''on'')
-      | list | length == 0 }}'
-    timeout: 00:05:00
-    continue_on_timeout: true
-  - condition: template
-    value_template: '{{ not wait.completed }}'
-  - action: switch.turn_off
-    target:
-      entity_id: '{{ zbmini_entity }}'
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ window.open }}'
+      sequence:
+      - action: switch.turn_off
+        target:
+          entity_id: '{{ zbmini_entity }}'
+        data: {}
+    default:
+    - action: switch.turn_on
+      target:
+        entity_id: '{{ zbmini_entity }}'
+      data: {}
 any_window_open:
   alias: AnyWindowOpen
   description: Prueft, ob in einer Area mindestens ein Fenster geoeffnet ist.
@@ -264,17 +265,16 @@ setheizkreisventilebetriebsmodus:
           - action: switch.turn_off
             target:
               entity_id: '{{ detached }}'
+            data: {}
           - action: switch.turn_off
             target:
               entity_id: '{{ repeat.item }}'
+            data: {}
           - action: climate.set_hvac_mode
             target:
               entity_id: '{{ thermostat }}'
             data:
               hvac_mode: 'off'
-          - action: script.heizkreisventilsteuerung
-            data:
-              zbmini_entity: '{{ repeat.item }}'
         - conditions:
           - condition: state
             entity_id: sensor.heizungsbetriebsmodus
@@ -286,6 +286,9 @@ setheizkreisventilebetriebsmodus:
               - '{{ detached }}'
               - '{{ repeat.item }}'
             data: {}
+      - action: script.heizkreisventilsteuerung
+        data:
+          zbmini_entity: '{{ repeat.item }}'
 bewasserung_kreis_ausfuhren:
   alias: Bewässerung Kreis ausführen
   mode: queued
@@ -314,16 +317,12 @@ legionellenprogramm_warmwasser:
   variables:
     LegioTemp: 59
     LegioHyst: 1
-    DefaultTemp: 46
     DefaultHyst: 3
   sequence:
   - alias: WW-Sollwerte auf Legionellenbetrieb setzen
-    action: number.set_value
+    action: input_number.set_value
     target:
-      entity_id:
-      - number.heizung_ww_eco_temp
-      - number.heizung_ww_komf_temp
-      - number.heizung_speichersolltemp
+      entity_id: input_number.currently_set_water_temp
     data:
       value: '{{ LegioTemp + LegioHyst }}'
   - alias: WW-Hysterese auf Legionellenbetrieb setzen
@@ -351,14 +350,11 @@ legionellenprogramm_warmwasser:
     data:
       value: '{{ DefaultHyst }}'
   - alias: WW-Sollwerte zurücksetzen
-    action: number.set_value
+    action: input_number.set_value
     target:
-      entity_id:
-      - number.heizung_ww_eco_temp
-      - number.heizung_ww_komf_temp
-      - number.heizung_speichersolltemp
+      entity_id: input_number.currently_set_water_temp
     data:
-      value: '{{ DefaultTemp }}'
+      value: '{{ states(''input_number.default_water_temp'') | float(46) }}'
 beetesprengen:
   sequence:
   - action: script.bewasserung_kreis_ausfuhren
@@ -395,7 +391,7 @@ wascheplatz:
   - action: script.bewasserung_kreis_ausfuhren
     metadata: {}
     data:
-      ventil: vvalve.sprenger4_hochbeet_sprenger4_hochbeet
+      ventil: valve.sprenger4_hochbeet_sprenger4_hochbeet
       dauer_minuten: 30
   alias: Wäscheplatz
   description: ''

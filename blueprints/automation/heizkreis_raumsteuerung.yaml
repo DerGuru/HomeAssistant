@@ -1,0 +1,50 @@
+blueprint:
+  name: Heizkreis Raumsteuerung
+  description: >
+    Steuert das Heizkreisventil eines Raumes: bei HA-Start, Fensteränderung
+    oder geändertem Thermostat-Sollwert wird der zentrale Dispatcher
+    (script.heizkreisventilsteuerung) mit dem ZBMINI-Switch des Raumes
+    aufgerufen. Ersetzt die je Raum kopierten Einzelautomationen.
+  domain: automation
+  # Lokaler Blueprint: source_url optional. Bei Weitergabe URL der Datei eintragen,
+  # damit "Blueprint neu importieren" funktioniert.
+  input:
+    window_sensor:
+      name: Fenstersensor
+      description: Der Fenster-Binärsensor des Raumes.
+      selector:
+        entity:
+          domain: binary_sensor
+    thermostat:
+      name: Thermostat
+      description: Das Klimagerät/Thermostat des Raumes (Trigger auf Sollwert).
+      selector:
+        entity:
+          domain: climate
+    zbmini_switch:
+      name: ZBMINI Heizkreis-Switch
+      description: Der SONOFF ZBMINIR2, der das Heizkreisventil des Raumes schaltet.
+      selector:
+        entity:
+          domain: switch
+
+mode: queued
+max: 10
+
+triggers:
+  - trigger: homeassistant
+    event: start
+  - trigger: state
+    entity_id: !input window_sensor
+  - trigger: state
+    entity_id: !input thermostat
+    attribute: temperature
+
+conditions: []
+
+actions:
+  - delay:
+      milliseconds: 300
+  - action: script.heizkreisventilsteuerung
+    data:
+      zbmini_entity: !input zbmini_switch

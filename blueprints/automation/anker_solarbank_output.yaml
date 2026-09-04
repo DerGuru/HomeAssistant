@@ -1,0 +1,101 @@
+blueprint:
+  name: Anker Solarbank Output Steuerung
+  description: >
+    Setzt die berechnete Soll-Ausgabe (Target-Sensor) auf eine Anker Solarbank
+    E1600: aktiviert/deaktiviert den Power-Export und schreibt das Output-Preset,
+    getriggert durch relevante Aenderungen von Target/Differenz. Ersetzt die je
+    Seite kopierten "Anker Set L/R Target"-Automationen.
+  domain: automation
+  homeassistant:
+    min_version: "2024.10.0"
+  input:
+    target_sensor:
+      name: Target-Sensor (Soll-Ausgabe in W)
+      selector:
+        entity:
+          domain: sensor
+    difference_sensor:
+      name: Differenz-Sensor (Soll minus aktueller Preset)
+      selector:
+        entity:
+          domain: sensor
+    output_preset:
+      name: Output-Preset (number)
+      selector:
+        entity:
+          domain: number
+    export_switch:
+      name: Power-Export-Switch
+      selector:
+        entity:
+          domain: switch
+
+mode: queued
+max: 10
+
+variables:
+  target_sensor_entity: !input target_sensor
+
+triggers:
+  - trigger: numeric_state
+    entity_id: !input difference_sensor
+    above: 29
+  - trigger: numeric_state
+    entity_id: !input difference_sensor
+    below: 0
+  - trigger: numeric_state
+    entity_id: !input target_sensor
+    below: 100
+  - trigger: numeric_state
+    entity_id: !input target_sensor
+    above: 99
+
+conditions:
+  - condition: not
+    conditions:
+      - condition: state
+        entity_id: !input output_preset
+        state: unavailable
+
+actions:
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: !input export_switch
+            state: "off"
+          - condition: numeric_state
+            entity_id: !input target_sensor
+            above: 99
+        sequence:
+          - action: switch.turn_on
+            target:
+              entity_id: !input export_switch
+          - action: number.set_value
+            target:
+              entity_id: !input output_preset
+            data:
+              value: "{{ states(target_sensor_entity) | int }}"
+      - conditions:
+          - condition: state
+            entity_id: !input export_switch
+            state: "on"
+          - condition: numeric_state
+            entity_id: !input target_sensor
+            above: 99
+        sequence:
+          - action: number.set_value
+            target:
+              entity_id: !input output_preset
+            data:
+              value: "{{ states(target_sensor_entity) | int }}"
+      - conditions:
+          - condition: state
+            entity_id: !input export_switch
+            state: "on"
+          - condition: numeric_state
+            entity_id: !input target_sensor
+            below: 100
+        sequence:
+          - action: switch.turn_off
+            target:
+              entity_id: !input export_switch

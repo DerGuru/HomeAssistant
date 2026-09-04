@@ -1,0 +1,38 @@
+# Schlafzimmer Shortcut Button
+# Zigbee IEEE: 70:ac:08:ff:fe:e0:42:a3
+#
+# ACHTUNG – anderes Muster als die Aqara-Wandschalter:
+# Dieser Button nutzt ZWEI Cluster: on/off auf Cluster 6 (On/Off),
+# move_with_on_off/stop_with_on_off auf Cluster 8 (Level Control).
+# Es gibt KEIN args.press_type. Die Geste steckt im `command`:
+#   on               -> single   (Cluster 6)
+#   off              -> double   (Cluster 6)
+#   move_with_on_off -> hold     (Cluster 8)
+#   stop_with_on_off -> release  (Cluster 8)
+# Deshalb filtern wir NUR auf device_ieee (nicht auf cluster_id) und
+# unterscheiden ueber den command. So werden beide Cluster erfasst.
+
+- triggers:
+    - trigger: event
+      event_type: zha_event
+      event_data:
+        device_ieee: "70:ac:08:ff:fe:e0:42:a3"
+
+  conditions:
+    - condition: template
+      value_template: >
+        {{ trigger.event.data.command
+           in ['on', 'off', 'move_with_on_off', 'stop_with_on_off'] }}
+
+  event:
+    - name: "Schlafzimmer Shortcut"
+      unique_id: schlafzimmer_shortcut
+      default_entity_id: event.schlafzimmer_shortcut
+      device_class: button
+      icon: mdi:gesture-tap-button
+      event_type: >
+        {{ {'on': 'single',
+            'off': 'double',
+            'move_with_on_off': 'hold',
+            'stop_with_on_off': 'release'}[trigger.event.data.command] }}
+      event_types: "{{ ['single', 'double', 'hold', 'release'] }}"

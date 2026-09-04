@@ -1,0 +1,74 @@
+# Wohnzimmerschalter
+# Zigbee IEEE: 54:ef:44:10:01:43:f0:fe
+
+# Button 1
+- triggers:
+    - trigger: event
+      event_type: zha_event
+      event_data:
+        device_ieee: "54:ef:44:10:01:43:f0:fe"
+        endpoint_id: 1
+        cluster_id: 18
+
+  conditions:
+    - condition: template
+      value_template: >
+        {{ trigger.event.data.get('args', {}).get('press_type', '')
+           in ['single', 'double', 'hold', 'release'] }}
+
+  event:
+    - name: "Wohnzimmerschalter Button 1"
+      unique_id: wohnzimmerschalter_button_1
+      default_entity_id: event.wohnzimmerschalter_button_1
+      device_class: button
+      icon: mdi:numeric-1-box
+      event_type: "{{ trigger.event.data.args.press_type }}"
+      event_types: "{{ ['single', 'double', 'hold', 'release'] }}"
+
+# Button 2
+- triggers:
+    - trigger: event
+      event_type: zha_event
+      event_data:
+        device_ieee: "54:ef:44:10:01:43:f0:fe"
+        endpoint_id: 2
+        cluster_id: 18
+
+  conditions:
+    - condition: template
+      value_template: >
+        {{ trigger.event.data.get('args', {}).get('press_type', '')
+           in ['single', 'double', 'hold', 'release'] }}
+
+  event:
+    - name: "Wohnzimmerschalter Button 2"
+      unique_id: wohnzimmerschalter_button_2
+      default_entity_id: event.wohnzimmerschalter_button_2
+      device_class: button
+      icon: mdi:numeric-2-box
+      event_type: "{{ trigger.event.data.args.press_type }}"
+      event_types: "{{ ['single', 'double', 'hold', 'release'] }}"
+
+# Button 3
+- triggers:
+    - trigger: event
+      event_type: zha_event
+      event_data:
+        device_ieee: "54:ef:44:10:01:43:f0:fe"
+        endpoint_id: 3
+        cluster_id: 18
+
+  conditions:
+    - condition: template
+      value_template: >
+        {{ trigger.event.data.get('args', {}).get('press_type', '')
+           in ['single', 'double', 'hold', 'release'] }}
+
+  event:
+    - name: "Wohnzimmerschalter Button 3"
+      unique_id: wohnzimmerschalter_button_3
+      default_entity_id: event.wohnzimmerschalter_button_3
+      device_class: button
+      icon: mdi:numeric-3-box
+      event_type: "{{ trigger.event.data.args.press_type }}"
+      event_types: "{{ ['single', 'double', 'hold', 'release'] }}"

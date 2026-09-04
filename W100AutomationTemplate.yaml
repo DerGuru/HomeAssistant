@@ -1,0 +1,140 @@
+alias: Treppenschalter
+description: ""
+triggers:
+  - trigger: event.received
+    target:
+      entity_id: event.treppenschalter_button_1
+    options:
+      event_type:
+        - single
+    id: button_1_single
+  - trigger: event.received
+    target:
+      entity_id: event.treppenschalter_button_2
+    options:
+      event_type:
+        - single
+    id: button_2_single
+  - trigger: event.received
+    target:
+      entity_id: event.treppenschalter_button_3
+    options:
+      event_type:
+        - single
+    id: button_3_single
+  - trigger: event.received
+    target:
+      entity_id: event.treppenschalter_button_1
+    options:
+      event_type:
+        - double
+    id: button_1_double
+  - trigger: event.received
+    target:
+      entity_id: event.treppenschalter_button_2
+    options:
+      event_type:
+        - double
+    id: button_2_double
+  - trigger: event.received
+    target:
+      entity_id: event.treppenschalter_button_3
+    options:
+      event_type:
+        - double
+    id: button_3_double
+  - trigger: event.received
+    target:
+      entity_id: event.treppenschalter_button_1
+    options:
+      event_type:
+        - hold
+    id: button_1_hold
+  - trigger: event.received
+    target:
+      entity_id: event.treppenschalter_button_1
+    options:
+      event_type:
+        - release
+    id: button_1_release
+  - trigger: event.received
+    target:
+      entity_id: event.treppenschalter_button_2
+    options:
+      event_type:
+        - hold
+    id: button_2_hold
+  - trigger: event.received
+    target:
+      entity_id: event.treppenschalter_button_2
+    options:
+      event_type:
+        - release
+    id: button_2_release
+  - trigger: event.received
+    target:
+      entity_id: event.treppenschalter_button_3
+    options:
+      event_type:
+        - hold
+    id: button_3_hold
+  - trigger: event.received
+    target:
+      entity_id: event.treppenschalter_button_3
+    options:
+      event_type:
+        - release
+    id: button_3_release
+conditions: []
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: button_1_single
+        sequence: []
+      - conditions:
+          - condition: trigger
+            id: button_1_double
+        sequence: []
+      - conditions:
+          - condition: trigger
+            id: button_1_hold
+        sequence: []
+      - conditions:
+          - condition: trigger
+            id: button_1_release
+        sequence: []
+      - conditions:
+          - condition: trigger
+            id: button_2_single
+        sequence: []
+      - conditions:
+          - condition: trigger
+            id: button_2_double
+        sequence: []
+      - conditions:
+          - condition: trigger
+            id: button_2_hold
+        sequence: []
+      - conditions:
+          - condition: trigger
+            id: button_2_release
+        sequence: []
+      - conditions:
+          - condition: trigger
+            id: button_3_single
+        sequence: []
+      - conditions:
+          - condition: trigger
+            id: button_3_double
+        sequence: []
+      - conditions:
+          - condition: trigger
+            id: button_3_hold
+        sequence: []
+      - conditions:
+          - condition: trigger
+            id: button_3_release
+        sequence: []
+    enabled: true
+mode: restart

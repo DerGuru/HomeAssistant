@@ -1,0 +1,204 @@
+{% set currentSide = 'r' %}
+{% set otherSide = 'l' %}
+
+{% set min_output = 100 %}
+{% set max_output = 800 %}
+{% set min_soc = 10 %}
+{% set step = states('input_number.solar_precision_factor') | int(10) %}
+
+{# Einspeisebremse:
+   Wenn sensor.hausgesamtenergie_power kleiner als -300 W ist,
+   wird die nach Score schwächere Seite auf 0 gesetzt.
+#}
+{% set export_limit = states('input_number.solar_export_limit') | float(300) %}
+
+{# PV-Bonus:
+   0.0 = PV egal, reine SoC-Verteilung
+   1.0 = PV deutlich berücksichtigen
+   1.5 = PV stark bevorzugen
+#}
+{% set pv_boost = states('input_number.solar_pv_steering_factor') | float(1.0) %}
+
+{# Wenn true: bei z.B. 850 W Bedarf liefert die zweite Seite 100 W statt 0 W.
+   Das vermeidet eher Netzbezug, kann aber leicht überdecken/einspeisen.
+#}
+{% set fill_small_remainder = is_state('input_boolean.prefer_solar_power_on_gap', 'on') %}
+
+{# Wenn true: auch bei Bedarf unter min_output wird die stärkere Seite auf min_output gesetzt.
+   Ich würde das meist auf false lassen, um Kleinst-Überproduktion zu vermeiden.
+#}
+{% set cover_low_demand = is_state('input_boolean.prefer_solar_power_on_low_demand', 'on') %}
+
+{% set currentSocName = 'sensor.' ~ currentSide ~ '_solarbank_e1600_state_of_charge' %}
+{% set otherSocName = 'sensor.' ~ otherSide ~ '_solarbank_e1600_state_of_charge' %}
+
+{# Diese beiden Sensoren ggf. an deine echten PV-Leistungssensoren anpassen #}
+{% set currentPvName = 'sensor.' ~ currentSide ~ '_solarbank_e1600_solar_power' %}
+{% set otherPvName = 'sensor.' ~ otherSide ~ '_solarbank_e1600_solar_power' %}
+
+{% set currentSocState = states(currentSocName) %}
+{% set otherSocState = states(otherSocName) %}
+
+{% if currentSocState in ['unavailable', 'unknown', 'none']
+      or otherSocState in ['unavailable', 'unknown', 'none'] %}
+  0
+{% else %}
+  {% set currentSoc = currentSocState | float(0) %}
+  {% set otherSoc = otherSocState | float(0) %}
+
+  {% set currentPv = states(currentPvName) | float(0) %}
+  {% set otherPv = states(otherPvName) | float(0) %}
+
+  {% if currentPv < 0 %}
+    {% set currentPv = 0 %}
+  {% endif %}
+
+  {% if otherPv < 0 %}
+    {% set otherPv = 0 %}
+  {% endif %}
+
+  {# Gesamtbedarf einlesen und auf 10 W aufrunden, damit eher kein Netzbezug bleibt #}
+  {% set totalRaw = states('sensor.min_sum_haus_heizung') | float(0) %}
+
+  {# Netzbezug: negativer Wert bedeutet Einspeisung #}
+  {% set grid_power = states('sensor.hausgesamtenergie_power') | float(0) %}
+  {% set strong_export = grid_power < (0 - export_limit) %}
+
+  {% if totalRaw <= 0 %}
+    {% set totalDemand = 0 %}
+  {% else %}
+    {% set totalDemand = (((totalRaw + step - 1) // step) * step) | int %}
+  {% endif %}
+
+  {% if totalDemand > max_output * 2 %}
+    {% set totalDemand = max_output * 2 %}
+  {% endif %}
+
+  {# SoC nutzbar normieren: min_soc wird zu 0, 100% wird zu 1 #}
+  {% if currentSoc <= min_soc %}
+    {% set currentSocNorm = 0 %}
+  {% else %}
+    {% set currentSocNorm = (currentSoc - min_soc) / (100 - min_soc) %}
+  {% endif %}
+
+  {% if otherSoc <= min_soc %}
+    {% set otherSocNorm = 0 %}
+  {% else %}
+    {% set otherSocNorm = (otherSoc - min_soc) / (100 - min_soc) %}
+  {% endif %}
+
+  {% if currentSocNorm > 1 %}
+    {% set currentSocNorm = 1 %}
+  {% endif %}
+
+  {% if otherSocNorm > 1 %}
+    {% set otherSocNorm = 1 %}
+  {% endif %}
+
+  {# Quadratische SoC-Gewichtung für mehr Spreizung #}
+  {% set currentSocScore = currentSocNorm * currentSocNorm %}
+  {% set otherSocScore = otherSocNorm * otherSocNorm %}
+
+  {# PV normieren: 0..1 je Seite #}
+  {% set currentPvNorm = currentPv / max_output %}
+  {% set otherPvNorm = otherPv / max_output %}
+
+  {% if currentPvNorm > 1 %}
+    {% set currentPvNorm = 1 %}
+  {% endif %}
+
+  {% if otherPvNorm > 1 %}
+    {% set otherPvNorm = 1 %}
+  {% endif %}
+
+  {# Gesamtscore: SoC ist Basis, PV gibt tagsüber Bonus #}
+  {% set currentScore = currentSocScore * (1 + currentPvNorm * pv_boost) %}
+  {% set otherScore = otherSocScore * (1 + otherPvNorm * pv_boost) %}
+  {% set scoreSum = currentScore + otherScore %}
+
+  {# Bei Gleichstand gewinnt r. Dadurch geht bei starker Einspeisung l auf 0. #}
+  {% set currentWinsTie = currentSide == 'r' %}
+  {% set currentDominant = currentScore > otherScore or (currentScore == otherScore and currentWinsTie) %}
+
+  {# Einspeisebremse: Bei starker Einspeisung wird nur die schwächere Seite abgeschaltet. #}
+  {% set shed_this_side = strong_export and not currentDominant %}
+
+  {% set target = 0 %}
+
+  {% if shed_this_side %}
+    {% set target = 0 %}
+
+  {% elif totalDemand <= 0 %}
+    {% set target = 0 %}
+
+  {% elif currentSoc <= min_soc %}
+    {% set target = 0 %}
+
+  {% elif scoreSum <= 0 %}
+    {% set target = 0 %}
+
+  {% elif totalDemand < min_output %}
+    {# Bedarf unter Mindestabgabe: optional trotzdem min_output setzen #}
+    {% if cover_low_demand and currentDominant %}
+      {% set target = min_output %}
+    {% else %}
+      {% set target = 0 %}
+    {% endif %}
+
+  {% elif totalDemand < min_output * 2 %}
+    {# Gesamtbedarf reicht nur sinnvoll für eine Seite #}
+    {% if currentDominant %}
+      {% set target = totalDemand %}
+    {% else %}
+      {% set target = 0 %}
+    {% endif %}
+
+  {% else %}
+    {# Normalfall: Demand-basiert nach Score verteilen #}
+    {% set currentWeight = currentScore / scoreSum %}
+    {% set rawCurrent = totalDemand * currentWeight %}
+    {% set rawOther = totalDemand - rawCurrent %}
+
+    {% if rawCurrent < min_output or rawOther < min_output %}
+      {# Eine Seite wäre unter min_output: dominante Seite übernimmt möglichst viel #}
+      {% if currentDominant %}
+        {% if totalDemand > max_output %}
+          {% set target = max_output %}
+        {% else %}
+          {% set target = totalDemand %}
+        {% endif %}
+      {% else %}
+        {% if totalDemand > max_output %}
+          {% set target = totalDemand - max_output %}
+
+          {% if fill_small_remainder and target > 0 and target < min_output %}
+            {% set target = min_output %}
+          {% endif %}
+        {% else %}
+          {% set target = 0 %}
+        {% endif %}
+      {% endif %}
+    {% else %}
+      {% set target = rawCurrent %}
+    {% endif %}
+  {% endif %}
+
+  {# Auf 10 W aufrunden, damit Demand eher gedeckt wird #}
+  {% if target <= 0 %}
+    0
+  {% else %}
+    {% set rounded = (((target + step - 1) // step) * step) | int %}
+
+    {% if rounded < min_output %}
+      {% if cover_low_demand %}
+        {{ min_output }}
+      {% else %}
+        0
+      {% endif %}
+    {% elif rounded > max_output %}
+      {{ max_output }}
+    {% else %}
+      {{ rounded }}
+    {% endif %}
+  {% endif %}
+{% endif %}

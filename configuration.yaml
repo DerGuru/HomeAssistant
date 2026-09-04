@@ -9,6 +9,7 @@ frontend:
 automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
+template: !include_dir_merge_list templates/
 
 #eigene zigbee komponenten
 zha:
@@ -21,4 +22,5 @@ zha:
 # ssl_certificate: /ssl/fullchain.pem
 #  ssl_key: /ssl/privkey.pem
 
-logging: default
+logger: 
+  default: warning

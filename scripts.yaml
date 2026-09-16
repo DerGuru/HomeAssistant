@@ -395,3 +395,82 @@ wascheplatz:
       dauer_minuten: 30
   alias: Wäscheplatz
   description: ''
+heizung_programmziel_bestimmen:
+  alias: Heizung – Programmziel bestimmen
+  description: Zentrale Entscheidungslogik fuer select.heizung_programmschalter, ersetzt
+    die frueher in 5 Einzelautomationen duplizierte Logik. Schwellwerte ueber input_number.heizung_aussentemp_kalt_schwelle
+    / _warm_schwelle tunbar, ohne dieses Script anzufassen. sensor.heizungsbetriebsmodus
+    wird hier NUR gelesen (als Bedingung) - NIE als Trigger einer Automation verwenden,
+    die dieses Script aufruft (Zyklusrisiko, da select.heizung_programmschalter Eingang
+    des Sensors ist).
+  sequence:
+  - choose:
+    - alias: Terrassentuer offen + Heizen -> Warmwasser
+      conditions:
+      - condition: state
+        entity_id: binary_sensor.terassentur
+        state: 'on'
+      - condition: state
+        entity_id: sensor.heizungsbetriebsmodus
+        state: Heating
+      - condition: state
+        entity_id: binary_sensor.heizung_verdichter
+        state: 'off'
+      sequence:
+      - action: select.select_option
+        target:
+          entity_id: select.heizung_programmschalter
+        data:
+          option: Warmwasser
+    - alias: Zu kalt + Heizen -> Programm
+      conditions:
+      - condition: numeric_state
+        entity_id: sensor.heizung_aussentemp
+        below: input_number.heizung_aussentemp_kalt_schwelle
+      - condition: state
+        entity_id: sensor.heizungsbetriebsmodus
+        state: Heating
+      - condition: not
+        conditions:
+        - condition: state
+          entity_id: binary_sensor.terassentur
+          state: 'on'
+      sequence:
+      - action: select.select_option
+        target:
+          entity_id: select.heizung_programmschalter
+        data:
+          option: Programm
+    - alias: Zu warm + nicht Kuehlen -> Warmwasser
+      conditions:
+      - condition: numeric_state
+        entity_id: sensor.heizung_aussentemp
+        above: input_number.heizung_aussentemp_warm_schwelle
+      - condition: not
+        conditions:
+        - condition: state
+          entity_id: sensor.heizungsbetriebsmodus
+          state: Cooling
+      - condition: not
+        conditions:
+        - condition: state
+          entity_id: binary_sensor.terassentur
+          state: 'on'
+      sequence:
+      - action: select.select_option
+        target:
+          entity_id: select.heizung_programmschalter
+        data:
+          option: Warmwasser
+    default:
+    - condition: not
+      conditions:
+      - condition: state
+        entity_id: select.heizung_programmschalter
+        state: Programm
+    - action: select.select_option
+      target:
+        entity_id: select.heizung_programmschalter
+      data:
+        option: Programm
+  mode: single

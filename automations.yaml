@@ -448,115 +448,6 @@
       difference_sensor: sensor.r_target_difference
       output_preset: number.r_solarbank_e1600_system_output_preset
       export_switch: switch.r_solarbank_e1600_allow_power_export
-- id: '1775061527011'
-  alias: Heizung – Terrassentür offen -> Warmwasser
-  description: ''
-  triggers:
-  - trigger: state
-    entity_id: binary_sensor.terassentur
-    to: 'on'
-  - trigger: state
-    entity_id:
-    - sensor.heizungsbetriebsmodus
-    from: Cooling
-    to: Heating
-  - trigger: state
-    entity_id:
-    - select.heizung_programmschalter
-  conditions:
-  - condition: state
-    entity_id: sensor.heizungsbetriebsmodus
-    state: Heating
-  - condition: state
-    entity_id: binary_sensor.terassentur
-    state: 'on'
-  - condition: state
-    entity_id: select.heizung_programmschalter
-    state: Programm
-  actions:
-  - choose:
-    - conditions:
-      - condition: state
-        entity_id: binary_sensor.heizung_verdichter
-        state: 'off'
-      sequence:
-      - action: select.select_option
-        target:
-          entity_id: select.heizung_programmschalter
-        data:
-          option: Warmwasser
-      - delay:
-          hours: 0
-          minutes: 0
-          seconds: 30
-          milliseconds: 0
-        enabled: false
-    - conditions:
-      - condition: state
-        entity_id: binary_sensor.heizung_verdichter
-        state: 'on'
-      sequence:
-      - wait_for_trigger:
-        - trigger: state
-          entity_id: binary_sensor.heizung_verdichter
-          to: 'off'
-        - trigger: state
-          entity_id: binary_sensor.terassentur
-          to: 'off'
-        timeout: 00:15:00
-        continue_on_timeout: false
-      - condition: state
-        entity_id: binary_sensor.terassentur
-        state: 'on'
-      - condition: state
-        entity_id: select.heizung_programmschalter
-        state: Programm
-      - action: select.select_option
-        target:
-          entity_id: select.heizung_programmschalter
-        data:
-          option: Warmwasser
-  mode: restart
-- id: '1775119620638'
-  alias: Heizung – Terrassentür geschlossen -> Programm
-  description: Wenn die Terassentür geschlossen wird oder die Heizung in den Kühlmodus
-    geht, dann wird der Warmwassermodus, der sonst im Heizmodus aktiv ist zum Programmmodus
-  triggers:
-  - trigger: state
-    entity_id: binary_sensor.terassentur
-    to: 'off'
-  - trigger: state
-    entity_id: sensor.heizungsbetriebsmodus
-    from: Heating
-    to: Cooling
-  conditions:
-  - condition: state
-    entity_id: select.heizung_programmschalter
-    state: Warmwasser
-  actions:
-  - choose:
-    - conditions:
-      - condition: state
-        entity_id: sensor.heizungsbetriebsmodus
-        state:
-        - Heating
-      - condition: numeric_state
-        entity_id: sensor.heizung_aussentemp
-        above: 22
-      sequence:
-      - action: select.select_option
-        target:
-          entity_id: select.heizung_programmschalter
-        data:
-          option: Warmwasser
-    default:
-    - action: select.select_option
-      target:
-        entity_id: select.heizung_programmschalter
-      data:
-        option: Programm
-  mode: queued
-  max: 10
 - id: '1776798325469'
   alias: Licht – Schlafzimmer (Shortcut)
   description: Shortcut-Button via event.schlafzimmer_shortcut (ZHA→Event-Entity,
@@ -873,69 +764,6 @@
       seconds: 0
       milliseconds: 0
   mode: single
-- id: '1781081894269'
-  alias: Heizung – Warm nur Warmwasser
-  description: ''
-  triggers:
-  - trigger: state
-    entity_id:
-    - sensor.heizungsbetriebsmodus
-  - trigger: numeric_state
-    entity_id:
-    - sensor.heizung_aussentemp
-    above: 22
-  conditions: []
-  actions:
-  - choose:
-    - conditions:
-      - condition: state
-        entity_id: sensor.heizungsbetriebsmodus
-        state:
-        - Heating
-      sequence:
-      - action: select.select_option
-        metadata: {}
-        target:
-          entity_id: select.heizung_programmschalter
-        data:
-          option: Warmwasser
-    - conditions:
-      - condition: state
-        entity_id: sensor.heizungsbetriebsmodus
-        state:
-        - Cooling
-      sequence:
-      - action: select.select_option
-        metadata: {}
-        target:
-          entity_id: select.heizung_programmschalter
-        data:
-          option: Programm
-  mode: single
-- id: '1781081971592'
-  alias: Heizung – Kühl aktiviert Heizkreise
-  description: ''
-  triggers:
-  - trigger: state
-    entity_id:
-    - sensor.heizungsbetriebsmodus
-  - trigger: numeric_state
-    entity_id:
-    - sensor.heizung_aussentemp
-    below: 21
-  conditions:
-  - condition: state
-    entity_id: sensor.heizungsbetriebsmodus
-    state:
-    - Heating
-  actions:
-  - action: select.select_option
-    metadata: {}
-    target:
-      entity_id: select.heizung_programmschalter
-    data:
-      option: Programm
-  mode: single
 - id: '1781456750441'
   alias: Licht – Büro EG Billy
   description: ''
@@ -1013,6 +841,10 @@
     entity_id: input_boolean.andreasda
     state:
     - 'on'
+  - condition: state
+    entity_id: input_boolean.juliada
+    state:
+    - 'off'
   actions:
   - action: script.tts_with_volume
     metadata: {}
@@ -1616,3 +1448,37 @@
     data:
       value: '{{ trigger.to_state.state }}'
   mode: single
+- id: '1789546488288'
+  alias: Heizung – Programmschalter zentral steuern
+  description: 'Ersetzt die 5 frueheren Einzelautomationen (Aussentemp x2, Terrassentuer-zu
+    x2 [darunter ein Copy-Paste-Bug-Duplikat], Terrassentuer-auf). Alle 4 Trigger
+    (Aussentemp geaendert, Tuer auf, Tuer zu, Verdichter aus) rufen ohne jede Sonderlogik
+    direkt script.heizung_programmziel_bestimmen auf. Aussentemp-Trigger haengt bewusst
+    an sensor.heizung_aussentemp_gerundet (auf 0,5 C gerundeter Template-Helfer) statt
+    am Rohsensor, damit nicht jeder Mini-Tick (im Schnitt alle 6-7 Min, in Buendeln
+    auch dichter) neu bewertet - das Script selbst liest fuer die eigentliche Schwellwert-Pruefung
+    weiterhin den ungerundeten Rohsensor sensor.heizung_aussentemp. Kein wait_for_trigger/Timeout
+    mehr noetig: das Script hat selbst ein verdichter==off-Gate in der Tuer-offen-Regel,
+    dadurch loest der Verdichter-aus-Trigger die Neubewertung von selbst aus, sobald
+    der Verdichter stoppt - unabhaengig davon, wie lange das dauert (keine 15-Minuten-Deckelung
+    mehr).'
+  triggers:
+  - trigger: state
+    entity_id: sensor.heizung_aussentemp_gerundet
+    id: aussentemp_geaendert
+  - trigger: state
+    entity_id: binary_sensor.terassentur
+    to: 'off'
+    id: tuer_zu
+  - trigger: state
+    entity_id: binary_sensor.terassentur
+    to: 'on'
+    id: tuer_auf
+  - trigger: state
+    entity_id: binary_sensor.heizung_verdichter
+    to: 'off'
+    id: verdichter_aus
+  actions:
+  - action: script.heizung_programmziel_bestimmen
+  mode: queued
+  max: 10

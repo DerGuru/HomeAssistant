@@ -1482,3 +1482,49 @@
   - action: script.heizung_programmziel_bestimmen
   mode: queued
   max: 10
+- id: '1790088535206'
+  alias: Waschmaschine ist fertig
+  description: Benachrichtigt per aPhone-Push und TTS am KüchenPod, sobald die Waschmaschine
+    (sensor.waschmaschine_power) nach einem Waschgang wieder auf ~0 W fällt.
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.waschmaschine_power
+    below: 2
+    for:
+      minutes: 2
+  conditions: []
+  actions:
+  - action: notify.send_message
+    target:
+      entity_id: notify.aphone
+    data:
+      message: Waschmaschine ist fertig
+  - action: script.tts_with_volume
+    data:
+      msg: Waschmaschine ist fertig
+      target_device: 2bcd073e7826d5b9ad641dcd745812a5
+      target_volume: 0.8
+  mode: single
+- id: '1790088828218'
+  alias: Wäschetrockner ist fertig
+  description: Benachrichtigt per aPhone-Push und TTS am KüchenPod, sobald der Trockner
+    (sensor.trockner_power) nach einem Trockengang wieder auf ~0 W fällt.
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.trockner_power
+    below: 2
+    for:
+      minutes: 2
+  conditions: []
+  actions:
+  - action: notify.send_message
+    target:
+      entity_id: notify.aphone
+    data:
+      message: Die Wäsche ist trocken.
+  - action: script.tts_with_volume
+    data:
+      msg: Die Wäsche ist trocken.
+      target_device: 2bcd073e7826d5b9ad641dcd745812a5
+      target_volume: 0.8
+  mode: single

@@ -6,28 +6,28 @@ Die Heizung ist innengeführt über die Wohnküche und damit auch die beiden Flu
 Alle Räume haben Fussbodenheizung.
 | Etage | Raumname | Größe in m²| Durchgang offen | verbunden mit (Etage - Raum) | Durchfluss l/min | dauerhaft offen |
 |-------|----------|------------|-------|------------------------------|------------------|-----------------|
-| EG    | Flur     | 11,34 | ja | OG - Flur | 1,0  | ja |
-| EG    | Bad      | 5,28 | nein | EG - Flur | 3,6 | ja |
-| EG    | Büro     | 8,79 | ja | EG - Flur | 1,0 | ja |
-| EG    | Wohnzimmer/-küche | 44,92 | ja | EG - Flur | 5,2 | ja |
+| EG    | Flur     | 11,34 | ja | OG - Flur | 0,75  | ja |
+| EG    | Bad      | 5,28 | nein | EG - Flur | 4 | ja |
+| EG    | Büro     | 8,79 | ja | EG - Flur | 1,0 | nein |
+| EG    | Wohnzimmer/-küche | 44,92 | ja | EG - Flur | 4 | ja |
 | OG    | Flur     | 7,35 | ja | EG - Flur | 0 | nein |
-| OG    | Bad      | 12,89 | nein | OG - Flur | 3,5 | ja |
-| OG    | Kinderzimmer | 14,50 | nein | OG - Flur | 3,0 | nein |
-| OG    | Büro     | 12,43 | nein | OG - Flur | 3,0 | nein |
-| OG    | Schlafzimmer | 13,78 | ja | OG - Ankleide | 2,0 | nein |
-| OG    | Ankleide | 7,69 | ja | OG - Schlafzimmer | 1,5 | nein |
+| OG    | Bad      | 12,89 | nein | OG - Flur | 4 | ja |
+| OG    | Kinderzimmer | 14,50 | nein | OG - Flur | 4 | nein |
+| OG    | Büro     | 12,43 | nein | OG - Flur | 4 | nein |
+| OG    | Schlafzimmer + Ankleide | 21,47 (13,78 + 7,69) | ja | Schlafzimmer ↔ Ankleide (Mauerdurchbruch) | 3 (2 + 1) | nein |
 
 ## Die Heizung
 Es ist eine Tecalor TTF 7 cool (Baujahr 2012/2013)  mit einer FEK verbaut, die in der Wohnküche angebracht ist.\
-Wir haben keinen Pufferspeicher - dadurch muss immer ein Mindestdurchfluss gegeben sein. \
-Ich habe deshalb einen hydraulischen Abgleich mit den folgenden Räumen vorgenommen: 
+Wir haben keinen Pufferspeicher - dadurch muss immer ein Mindestdurchfluss gegeben sein. Laut Datenblatt sind das 0,64 m³/h ≈ 10,67 l/min (Wasserseite). Dieser Wert enthält bereits einen Sicherheitspuffer – solange er nicht unterschritten wird, ist alles in Ordnung. Laut einem Tecalor-Techniker funktionieren 8 l/min noch als absolutes Minimum. 
+
+Gekühlt wird nur passiv (ohne Verdichter), dort ist der Mindestdurchfluss unkritisch. Im ungünstigsten Fall im Kühlbetrieb (Bad OG zu, alle Thermostat-Räume wegen offener Fenster zu): 8,75 l/min – knapp über dem absoluten Minimum, hat im Sommer 2026 problemlos funktioniert. \
+Folgende Räume sind dauerhaft offen: 
 - EG - Bad
-- EG - Büro
 - EG - Wohnzimmer mit Wohnküche
 - EG - Flur
-- OG - Bad 
+- OG - Bad (beim heizen, im Kühlbetrieb geschlossen)
 
-Die anderen Räume im OG werden über Thermostate gesteuert, die noch manuell zwischen Kühlbetrieb und Heizbetrieb geschaltet werden müssen. Das wird ein Smart Home Projekt, dass noch aussteht, weil ich im Sommer die Bäder schließen möchte und dafür die anderen Räume im OG dauerhaft öffnen will.
+Die übrigen Räume (Büro EG, Kinderzimmer, Büro OG, Schlafzimmer + Ankleide) werden über Thermostate gesteuert. Die Umschaltung zwischen Heiz- und Kühlbetrieb läuft automatisch über Home Assistant (siehe [Smart Home](#smart-home)). Im Kühlbetrieb wird nur das Bad OG geschlossen, das Bad EG bleibt offen.
 
 ### Technische Spezifikationen
 #### Wärmepumpe 
@@ -251,11 +251,9 @@ OFF
 # Smart Home
 
 Durch den hydraulischen Abgleich werden die Regler im EG praktisch nicht mehr benötigt.  
-Die Heizung fährt dort einfach „durch“, alle Kreise sind dauerhaft offen.
+Die Heizung fährt dort einfach „durch“, alle Kreise außer dem Arbeitszimmer EG sind dauerhaft offen.
 
-Das Shelly für die Heiz-/Kühlerkennung übernimmt zusätzlich eine manuelle Schaltfunktion für das Arbeitszimmer im EG. So kann der Raum bei Bedarf komplett aus dem Heiz-/Kühlbetrieb genommen werden – z. B. wenn er mal als Gästezimmer dient.
-
-Im OG werden vier Shelly verwendet, um zwischen Heiz- und Kühlbetrieb umzuschalten.  
+Im OG (Bad OG, Schlafzimmer + Ankleide, Arbeitszimmer OG, Kinderzimmer) und im Arbeitszimmer EG schaltet je ein Sonoff-Zigbee-Relais (ZBMINI-R2) den Stellmotor des Heizkreises.  
 Die Stellmotoren für die Ventile arbeiten nach dem Prinzip: **Strom = Ventil offen**.
 
 ---
@@ -274,37 +272,40 @@ In Home Assistant gibt es dafür einen Template-Sensor mit zwei Zuständen:
 
 ### Template-Sensor `sensor.heizungsbetriebsmodus`
 
+Grundprinzip: Lässt sich Heizen/Kühlen gerade nicht sauber bestimmen – Warmwasserbereitung läuft (`binary_sensor.heizung_warmwasserbereitung`) oder der Programmschalter steht auf `Warmwasser`/`Bereitschaft`/`Notbetrieb` –, hält der Sensor seinen letzten Wert (Fallback `Heating`, „im Zweifel heizen“). Sonst wird er frisch aus Kühlbetrieb-Signal und Rücklauf-Soll berechnet.
+
 ```YAML
 {% set p = states('select.heizung_programmschalter') %}
 {% set kein_kuehlen = p in ['Warmwasser', 'Bereitschaft', 'Notbetrieb'] %}
-{% set kuehlbetrieb = is_state('binary_sensor.heizung_kuehlbetrieb', 'on') %}
-{% set ruecklauf_soll = states('sensor.heizung_ruecklaufsolltemp') | float(99) %}
-
-{% if kein_kuehlen %}
-  Heating
-{% elif kuehlbetrieb or ruecklauf_soll <= 6 %}
-  Cooling
+{% set ww_aktiv = is_state('binary_sensor.heizung_warmwasserbereitung', 'on') %}
+{% if kein_kuehlen or ww_aktiv %}
+  {{ this.state if this.state not in ['unknown','unavailable',none] else 'Heating' }}
 {% else %}
-  Heating
+  {% set kuehlbetrieb = is_state('binary_sensor.heizung_kuehlbetrieb', 'on') %}
+  {% set ruecklauf_soll = states('sensor.heizung_ruecklaufsolltemp') | float(99) %}
+  {% if kuehlbetrieb or ruecklauf_soll <= 6 %}
+    Cooling
+  {% else %}
+    Heating
+  {% endif %}
 {% endif %}
 ```
 
+Der Fallback `ruecklauf_soll <= 6` hält den Kühlbetrieb stabil, wenn `kuehlbetrieb` kurz auf `off` geht, der Rücklauf-Soll aber bei ~5 °C bleibt – sonst würden die Ventile hin- und herschalten.
+
 ---
 
-## Automatische UmSchaltung Arbeitszimmer EG
+## Automatische Umschaltung Heizen/Kühlen (OG + Arbeitszimmer EG)
 
-Im EG gibt es noch einen einzigen verbleibenden Stellmotor, der nicht hydraulisch „fix“ mitläuft: das **Arbeitszimmer EG**. Der Stellmotor wird über ein Smart Relais geschaltet, an dessen Input ein Moes Zigbee Thermostat hängt.
+Im EG läuft nur das **Arbeitszimmer EG** nicht hydraulisch „fix“ mit – es wird genauso gesteuert wie die OG-Räume.
 
-## Automatische Umschaltung Heizen/Kühlen im OG
-
-Im OG sind vier **SONOF ZIGBEE RELAIS** verbaut, die die Stellmotoren für:
+Insgesamt sind fünf **SONOFF ZIGBEE RELAIS** (ZBMINI-R2) verbaut, die die Stellmotoren für:
 
 - Bad OG  
 - Schlafzimmer OG  + Ankleide  
 - Arbeitszimmer OG  
 - Kinderzimmer OG  
-
-und im EG ist ein **SONOF ZIGBEE RELAIS** verbaut, das den Stellmotor für das Arbeitszimmer EG
+- Arbeitszimmer EG  
 
 entsprechend dem **Heizungsbetriebsmodus** und den jeweiligen Raumthermostaten schalten.
 
@@ -350,6 +351,12 @@ Das Kinderzimmer soll vom Thermostat im Heizbetrieb auf einer Zieltemperatur geh
 
 ---
 
+### Arbeitszimmer EG
+
+Das Arbeitszimmer EG soll vom Thermostat im Heizbetrieb auf einer Zieltemperatur gehalten werden.
+
+---
+
 ## Automationen (Überblick)
 
 ### Zentraler Dispatcher (`script.heizkreisventilsteuerung`)
@@ -389,13 +396,32 @@ Das Bad OG hat weiterhin eine eigene, vereinfachte Automation (kein Thermostat, 
 
 ## Programmschalter-Automatik (Warmwasser ↔ Programm)
 
-Zusätzlich zur Heizkreis-Ventilsteuerung gibt es vier Automationen, die `select.heizung_programmschalter` zwischen `Programm` und `Warmwasser` hin- und herschalten, um Heizbetrieb bei warmem Wetter oder offener Terrassentür zu vermeiden:
+`select.heizung_programmschalter` wird zentral über ein Skript und eine Automation gesteuert, um Heizbetrieb bei warmem Wetter oder offener Terrassentür zu vermeiden. Das ersetzt seit 16.09.2026 fünf frühere Einzelautomationen, die sich gegenseitig in die Quere kamen.
 
-- **`Heizung – Warm nur Warmwasser`**: schaltet auf `Warmwasser`, wenn `sensor.heizung_aussentemp` über 22 °C steigt (während der Programmschalter im Heizbetrieb ist).
-- **`Heizung – Kühl aktiviert Heizkreise`**: schaltet zurück auf `Programm`, wenn `sensor.heizung_aussentemp` unter 21 °C fällt.
-- **`Heizung – Terrassentür offen -> Warmwasser`** / **`Heizung – Terrassentür geschlossen -> Programm`**: dieselbe Umschaltung, ausgelöst durch `binary_sensor.terassentur` statt durch die Außentemperatur (mit Rücksicht auf den laufenden Verdichter, `binary_sensor.heizung_verdichter`).
+### Skript `script.heizung_programmziel_bestimmen`
 
-**Bekannte Einschränkung (Stand 2026-08-27):** Diese vier Automationen prüfen historisch gewachsen teils `sensor.heizungsbetriebsmodus` statt direkt `select.heizung_programmschalter`. Da der Programmschalter-Zustand `Warmwasser` in `sensor.heizungsbetriebsmodus` immer als `Heating` klassifiziert wird (siehe Template oben), kann der Sensor den Zustand `Cooling` nicht mehr erreichen, sobald einmal auf `Warmwasser` geschaltet wurde – ein darauf wartender Rück-Umschalt-Zweig wäre totes Gleis. Ein Rewrite (Gate direkt auf `select.heizung_programmschalter` statt auf `sensor.heizungsbetriebsmodus`) ist geplant, aber noch nicht umgesetzt.
+Bestimmt aus dem aktuellen Zustand, wie der Programmschalter stehen soll. Die erste zutreffende Regel gewinnt:
+
+| # | Bedingung | Ziel |
+|---|-----------|------|
+| 1 | Terrassentür offen + `Heating` + Verdichter aus | `Warmwasser` |
+| 2 | Außentemperatur < Kalt-Schwelle + `Heating` + Terrassentür zu | `Programm` |
+| 3 | Außentemperatur > Warm-Schwelle + nicht `Cooling` + Terrassentür zu | `Warmwasser` |
+| – | sonst | `Programm` |
+
+- Schwellwerte als Helfer, ohne Skript-Änderung anpassbar: `input_number.heizung_aussentemp_kalt_schwelle` (aktuell 21 °C) und `input_number.heizung_aussentemp_warm_schwelle` (aktuell 22 °C).
+- Regel 1 wartet, bis der Verdichter steht – ein laufender Heizzyklus wird nicht abgebrochen.
+- Die Regeln hängen nur von Tür, Außentemperatur, Heizungsbetriebsmodus und Verdichter ab, nicht vom aktuellen Wert des Programmschalters. Dadurch ist das Ergebnis unabhängig davon, wie oft oder in welcher Reihenfolge das Skript läuft.
+
+### Automation `Heizung – Programmschalter zentral steuern`
+
+Ruft bei jedem Trigger nur das Skript auf (Modus `queued`):
+
+- Änderung von `sensor.heizung_aussentemp_gerundet` – Außentemperatur auf 0,5 °C gerundet, damit nicht jeder kleine Messwertsprung neu bewertet wird. Das Skript prüft die Schwellen weiterhin mit dem ungerundeten `sensor.heizung_aussentemp`.
+- Terrassentür auf / zu
+- Verdichter aus
+
+**Wichtig:** `sensor.heizungsbetriebsmodus` darf hier nur als Bedingung verwendet werden, nie als Trigger. Der Programmschalter ist ein Eingang dieses Sensors – ein Trigger würde einen Regelkreis erzeugen (daher kam früher das Hin- und Herschalten im Sekundentakt).
 
 ## Automatisierungs Ziel
 - mehr Sensoren an allen Fenstern und Türen erlauben gezielte automatische Abschaltung der Räume, wenn Fenster oder Türen offen sind.

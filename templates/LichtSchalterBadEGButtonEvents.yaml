@@ -1,0 +1,24 @@
+# Lichtschalter Bad EG (SONOFF ZBM5-2C-80/86)
+# Zigbee IEEE: 94:a0:81:ff:fe:e2:5f:98
+#
+# Gang 2 hat "Detach relay 2" aktiv -> Tastendruck sendet nur `toggle`
+# auf Cluster 6, Endpoint 2 (kein press_type, kein double/hold).
+
+# Button 2
+- triggers:
+    - trigger: event
+      event_type: zha_event
+      event_data:
+        device_ieee: "94:a0:81:ff:fe:e2:5f:98"
+        endpoint_id: 2
+        cluster_id: 6
+        command: toggle
+
+  event:
+    - name: "Lichtschalter Bad EG Button 2"
+      unique_id: lichtschalter_bad_eg_button_2
+      default_entity_id: event.lichtschalter_bad_eg_button_2
+      device_class: button
+      icon: mdi:numeric-2-box
+      event_type: toggle
+      event_types: "{{ ['toggle'] }}"

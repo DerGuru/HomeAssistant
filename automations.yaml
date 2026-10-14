@@ -231,13 +231,15 @@
   alias: Zitrone gießen
   description: ''
   triggers:
-  - trigger: numeric_state
+  - trigger: state
     entity_id: sensor.zitrone_soil_moisture
-    below: 40
   conditions:
   - condition: numeric_state
     entity_id: sensor.zitrone_soil_moisture
     above: 0
+  - condition: numeric_state
+    entity_id: sensor.zitrone_soil_moisture
+    below: 40
   actions:
   - action: script.tts_with_volume
     data:
@@ -1492,7 +1494,6 @@
     below: 2
     for:
       minutes: 2
-  conditions: []
   actions:
   - action: notify.send_message
     target:
@@ -1510,21 +1511,38 @@
   description: Benachrichtigt per aPhone-Push und TTS am KüchenPod, sobald der Trockner
     (sensor.trockner_power) nach einem Trockengang wieder auf ~0 W fällt.
   triggers:
-  - trigger: numeric_state
+  - below: 2
     entity_id: sensor.trockner_power
-    below: 2
     for:
       minutes: 2
-  conditions: []
+    trigger: numeric_state
   actions:
   - action: notify.send_message
-    target:
-      entity_id: notify.aphone
     data:
       message: Die Wäsche ist trocken.
+    target:
+      entity_id: notify.aphone
   - action: script.tts_with_volume
     data:
       msg: Die Wäsche ist trocken.
       target_device: 2bcd073e7826d5b9ad641dcd745812a5
       target_volume: 0.8
   mode: single
+- id: '1791998619626'
+  alias: Bad EG Spiegellicht per Taste 2 umschalten
+  description: Lichtschalter Bad EG, Taste 2 (Relais entkoppelt) schaltet das Spiegellicht
+    um.
+  triggers:
+  - trigger: event.received
+    target:
+      entity_id: event.lichtschalter_bad_eg_button_2
+    options:
+      event_type:
+      - toggle
+  conditions: []
+  actions:
+  - action: switch.toggle
+    target:
+      entity_id: switch.bad_eg_spiegellicht_bad_eg
+  mode: queued
+  max: 5

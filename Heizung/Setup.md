@@ -225,6 +225,14 @@ aus
 ### Bivalenz WW
 40 °C 
 
+Bewusst so eingestellt. Der Wert ist laut Handbuch eine **Außentemperatur** (Bereich -20 °C bis 30 °C, Werkseinstellung -20 °C): darunter schaltet die Zusatzheizung (DHC) bei der Warmwasserbereitung lastabhängig zu. Mit 40 °C ist das also **immer** der Fall.
+
+Grund: Komfort beim Vollbad. Wegen der Stillstandzeit (20 min) kann der Verdichter während eines langen Wasserbezugs nicht sofort wieder anlaufen – ohne Zusatzheizung kam am Ende des Vollbads nur noch lauwarmes Wasser. Hier tausche ich bewusst Geld gegen Komfort (und Frieden).
+
+Gemessen (Oktober 2026): Jede WW-Ladung schaltet die DHC-Stufen 1 → 2 → 3 im 2-Minuten-Takt zu, der Verdichter läuft nur die ersten ~4–13 Minuten mit, danach heizt allein die DHC mit ~9 kW. Mehrkosten gegenüber reinem Verdichterbetrieb grob 600–900 kWh/Jahr (~20 €/Monat).
+
+Nachverfolgung in Home Assistant über `sensor.wp_energie_warmwasser`, `sensor.wp_energie_heizen`, `sensor.wp_energie_standby` und `sensor.wp_energie_heizstab_aktiv` (seit 16.10.2026).
+
 ### WW-ECO
 aus 
 

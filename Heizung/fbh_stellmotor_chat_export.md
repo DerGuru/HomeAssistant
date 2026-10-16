@@ -94,7 +94,7 @@ Ein alternativer Weg wäre 24-V-3-Punkt-Antriebe plus Relais oder eine DIY-Lösu
 
 **Assistant:** Ja, grundsätzlich schon — aber mit einer wichtigen Einschränkung: Für einen PID-Regler in Home Assistant ist ein positionsfähiges Ventil sogar deutlich sinnvoller als ein normales thermisches Auf/Zu-Ventil.
 
-Der PID-Regler liefert typischerweise eine Stellgröße von 0–100 %. Mit einem echten 3-Punkt-Motorantrieb könntest du diese Stellgröße direkt als Ventilposition interpretieren:
+Der PID-Regler liefert typischerweise eine Stellgröße von 0–100 %. Mit einem echten 3-Punkt-Motorantrieb könntest du diese Stfxellgröße direkt als Ventilposition interpretieren:
 
 30 % PID-Ausgang → Ventil auf etwa 30 % Hub  
 65 % → etwa 65 % Hub  

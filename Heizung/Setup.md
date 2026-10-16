@@ -231,6 +231,8 @@ Grund: Komfort beim Vollbad. Wegen der Stillstandzeit (20 min) kann der Verdicht
 
 Gemessen (Oktober 2026): Jede WW-Ladung schaltet die DHC-Stufen 1 → 2 → 3 im 2-Minuten-Takt zu, der Verdichter läuft nur die ersten ~4–13 Minuten mit, danach heizt allein die DHC mit ~9 kW. Mehrkosten gegenüber reinem Verdichterbetrieb grob 600–900 kWh/Jahr (~20 €/Monat).
 
+Auswertung eines Vollbads (12.10.2026, 20:25–20:57): Der Speicher fiel von 50,4 °C auf 41,0 °C. In den ersten Minuten nach dem Zuschalten ist das Anlaufverzug (der Vorlauf stieg von 30 auf 54 °C in ca. 6 min, die Leistung stufenweise von 4 über 8,6 auf 11,5 kW). Mit DHC-Stufe 3 (ca. 15–16 kW Wärme inkl. Verdichter) wird der Abfall sehr flach, aber nicht gestoppt. Faustregel: Bei voll geöffnetem Hahn reicht die Leistung nicht ganz, bei halb bis dreiviertel offenem Hahn gerade so – und nur, solange der Verdichter mitläuft. Er schaltet in den WW-Ladungen der letzten 10 Tage bei ca. 44–46 °C Speichertemperatur wieder ab (Extremwerte 43,4 und 47,0 °C), meist nach 4–9 min, 13 min nur aus kaltem Speicher (31 °C). Danach bleiben ca. 9 kW DHC. Der Vorlauf liegt beim Abschalten konstant bei ca. 56–58 °C (9 Ladungen, Werte 55,5–58,6 °C), die Speichertemperatur streut dagegen. Der Verdichter schaltet also vermutlich wegen einer Vorlauf-/Hochdruckgrenze (HD 38,5 bar) ab und nicht wegen der Speichertemperatur. Die Hahnstellung ist aus dem Temperaturverlauf geschätzt, ein Durchflusssensor fehlt. Beobachtung: Geht der Bezug beim Vollbad weiter, kommt das Wasser erst wieder über ca. 46 °C, wenn der Hahn zu ist.
+
 Nachverfolgung in Home Assistant über `sensor.wp_energie_warmwasser`, `sensor.wp_energie_heizen`, `sensor.wp_energie_standby` und `sensor.wp_energie_heizstab_aktiv` (seit 16.10.2026).
 
 ### WW-ECO

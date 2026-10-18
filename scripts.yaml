@@ -317,7 +317,6 @@ legionellenprogramm_warmwasser:
   variables:
     LegioTemp: 59
     LegioHyst: 1
-    DefaultHyst: '{{ states(''input_number.default_hysterese'') | float(10) }}'
   sequence:
   - alias: WW-Sollwerte auf Legionellenbetrieb setzen
     action: input_number.set_value
@@ -348,7 +347,7 @@ legionellenprogramm_warmwasser:
     target:
       entity_id: number.heizung_ww_hysterese
     data:
-      value: '{{ DefaultHyst }}'
+      value: '{{ states(''input_number.default_hysterese'') | float(10) }}'
   - alias: WW-Sollwerte zurücksetzen
     action: input_number.set_value
     target:

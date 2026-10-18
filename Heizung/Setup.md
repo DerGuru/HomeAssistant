@@ -124,7 +124,7 @@ Hier ist der Heizbetrieb quasi ein Ersatz für die Anti-Legionellen-Funktion der
 Wir haben keine Zirkulation im WW-Kreis. Wenn der Hahn geöffnet wird, dann läuft erst mal einen Moment kaltes Wasser.
 
 ### Sollwerte
-Der WW-Sollwert wird **dynamisch aus Home Assistant** gesetzt (Details unter „Sollwert-Steuerung über Home Assistant“). Aktuell **~50 °C im Betrieb mit 6 K Hysterese** (reheizt ab ~44 °C).
+Der WW-Sollwert wird **dynamisch aus Home Assistant** gesetzt (Details unter „Sollwert-Steuerung über Home Assistant“). Aktuell **55 °C im Betrieb mit 10 K Hysterese** (reheizt ab 45 °C; Versuch seit 18.10.2026, vorher 50 °C mit 6 K Hysterese). Abends ab 20:00 Uhr gilt bis zum Ende der nächsten Ladung 1 K Hysterese (siehe „Abend-Hysterese (Abendboost)“).
 
 ### Regelzeiten (FEK)
 Mo 03:00 - 4:30
@@ -136,7 +136,7 @@ Seit August 2026 gibt es eine zusätzliche Steuerungsebene in Home Assistant, di
 
 Statt Automationen direkt auf die drei Sollwert-Entities (`number.heizung_speichersolltemp`, `number.heizung_ww_komf_temp`, `number.heizung_ww_eco_temp`) schreiben zu lassen, gibt es zwei `input_number`-Helfer:
 
-- **`input_number.default_water_temp`** („Default Water Temp“): der manuell gepflegte Normalwert (Startwert 46 °C, aktuell ~50 °C).
+- **`input_number.default_water_temp`** („Default Water Temp“): der manuell gepflegte Normalwert (Startwert 46 °C, aktuell 55 °C).
 - **`input_number.currently_set_water_temp`** („Currently Set Water Temp“): der gerade aktive Sollwert.
 
 Eine einzige Automation (`Heizung – WW-Solltemperatur übernehmen`) beobachtet `currently_set_water_temp` und überträgt jede Änderung per `number.set_value` auf alle drei realen Entities. Das ist die **einzige** Stelle, die die drei Hardware-Entities noch direkt anfasst – alle anderen Automationen/Skripte schreiben nur noch den Helferwert.
@@ -150,9 +150,19 @@ Die Automation `Heizung – Warmwasser Anwesenheit` reagiert auf die Presence-Gr
 - **Niemand da** (Gruppe → `off`): `currently_set_water_temp` wird auf **35 °C** gesetzt.
 - **Jemand da** (Gruppe → `on`): `currently_set_water_temp` wird auf den Wert von `default_water_temp` zurückgesetzt.
 
+#### Abend-Hysterese (Abendboost)
+
+Ziel: Zu Beginn der Badezeit soll der Speicher möglichst voll sein. Dafür gibt es:
+
+- **`input_number.default_hysterese`** („Default Hysterese“, Schieberegler 1–10 K, Schritt 0,5, aktuell 10 K): der Normalwert der WW-Hysterese (`number.heizung_ww_hysterese`). Die Abend-Automation und das Legionellenprogramm lesen ihn direkt von hier.
+- **Automation `Heizung – WW-Hysterese Abendboost`** (Modus `queued`):
+  - **20:00 Uhr:** `number.heizung_ww_hysterese` wird auf 1 K gesetzt, der Speicher lädt dann schon ab Soll − 1 K nach (bei 55 °C ab 54 °C).
+  - **Warmwasserbereitung aus** (`binary_sensor.heizung_warmwasserbereitung` von `on` auf `off`): Die Hysterese geht zurück auf den Wert von `default_hysterese`. Das passiert nur, wenn sie gerade unter dem Default liegt und das Legionellenprogramm nicht läuft.
+  - Ist der Speicher um 20:00 Uhr bereits über Soll − 1 K, startet keine Ladung. Die Hysterese bleibt dann bei 1 K, bis die nächste Ladung durch ist (durch Standby-Verluste nach wenigen Stunden).
+
 #### Legionellenprogramm
 
-`script.legionellenprogramm_warmwasser` hebt `currently_set_water_temp` auf `LegioTemp + LegioHyst` (aktuell 59 + 1 = 60 °C), wartet bis der Speicher (`sensor.heizung_speicheristtemp`) mindestens 59 °C erreicht (Timeout 1 h), hält danach 30 Minuten und setzt `currently_set_water_temp` anschließend wieder auf `default_water_temp` zurück. Das Skript hat **aktuell keinen automatischen Trigger** (keine Automation ruft es auf) – es muss manuell gestartet werden (z. B. über ein Dashboard oder die Skript-Übersicht).
+`script.legionellenprogramm_warmwasser` hebt `currently_set_water_temp` auf `LegioTemp + LegioHyst` (aktuell 59 + 1 = 60 °C) und setzt `number.heizung_ww_hysterese` auf `LegioHyst` (1 K). Dann wartet es, bis der Speicher (`sensor.heizung_speicheristtemp`) mindestens 60 °C erreicht (Timeout 1 h), und hält danach 30 Minuten. Anschließend setzt es die Hysterese auf den Wert von `input_number.default_hysterese` und `currently_set_water_temp` wieder auf `default_water_temp` zurück. Das Skript hat **aktuell keinen automatischen Trigger** (keine Automation ruft es auf) – es muss manuell gestartet werden (z. B. über ein Dashboard oder die Skript-Übersicht).
 
 ## Einstellungen an der FEK
 ### Heizkurve 
@@ -213,9 +223,11 @@ Der Druck wurde von einem Tecalor Techniker empfohlen und *sollte* nicht übesch
 ### Frostschutz
 4 °C.
 
-### Grenze Heizung 
-aus
+-20 °C (Versuch seit 18.10.2026, vorher 40 °C)
 
+Mit -20 °C (Werkseinstellung) schaltet die DHC nicht mehr parallel zum Verdichter zu. Sie übernimmt trotzdem immer, sobald der Verdichter an der Vorlaufgrenze (ca. 56–58 °C) abschaltet. Beobachtet am 18.10.2026 (Soll 55 °C): Der Verdichter lief 7,6 min allein und schaltete bei 56,5 °C Vorlauf und ca. 49 °C Speicher ab. Danach folgten NHZ1, NHZ2 und NHZ3 im 2-Minuten-Takt bis zum Sollwert. Die Ladung von 48,1 auf 55,0 °C dauerte 23 min und brauchte 2,29 kWh, davon 1,96 kWh bei laufender DHC. Gemessen wird über den Shelly (`sensor.heizenergie_power`), zugeordnet über die Template-Sensoren `sensor.wp_leistung_*`. Zum Vergleich: Eine Ladung von 44 auf 49,7 °C mit den alten Werten brauchte 2,06–2,14 kWh. Die Untergrenze für das Nachheizen liegt mit 45 °C kaum über den vorherigen 44 °C, der größere Puffer gilt also vor allem kurz nach einer Ladung. Noch nicht ausgewertet: mehrere Zyklen mit 10 K Hysterese und das Verhalten bei einem Vollbad.
+
+Vorher (Bivalenz WW 40 °C): Bewusst so eingestellt. Der Wert ist laut Handbuch eine **Außentemperatur** (Bereich -20 °C bis 30 °C, Werkseinstellung -20 °C): darunter schaltet die Zusatzheizung (DHC) bei der Warmwasserbereitung lastabhängig zu. Mit 40 °C war
 ### Bivalenz Heizung
 -20 °C
 
@@ -229,16 +241,16 @@ Bewusst so eingestellt. Der Wert ist laut Handbuch eine **Außentemperatur** (Be
 
 Grund: Komfort beim Vollbad. Wegen der Stillstandzeit (20 min) kann der Verdichter während eines langen Wasserbezugs nicht sofort wieder anlaufen – ohne Zusatzheizung kam am Ende des Vollbads nur noch lauwarmes Wasser. Hier tausche ich bewusst Geld gegen Komfort (und Frieden).
 
-Gemessen (Oktober 2026): Jede WW-Ladung schaltet die DHC-Stufen 1 → 2 → 3 im 2-Minuten-Takt zu, der Verdichter läuft nur die ersten ~4–13 Minuten mit, danach heizt allein die DHC mit ~9 kW. Mehrkosten gegenüber reinem Verdichterbetrieb grob 600–900 kWh/Jahr (~20 €/Monat).
+Gemessen (Oktober 2026, mit Bivalenz WW 40 °C): Jede WW-Ladung schaltet die DHC-Stufen 1 → 2 → 3 im 2-Minuten-Takt zu, der Verdichter läuft nur die ersten ~4–13 Minuten mit, danach heizt allein die DHC mit ~9 kW. Mehrkosten gegenüber reinem Verdichterbetrieb grob 600–900 kWh/Jahr (~20 €/Monat).
 
-Auswertung eines Vollbads (12.10.2026, 20:25–20:57): Der Speicher fiel von 50,4 °C auf 41,0 °C. In den ersten Minuten nach dem Zuschalten ist das Anlaufverzug (der Vorlauf stieg von 30 auf 54 °C in ca. 6 min, die Leistung stufenweise von 4 über 8,6 auf 11,5 kW). Mit DHC-Stufe 3 (ca. 15–16 kW Wärme inkl. Verdichter) wird der Abfall sehr flach, aber nicht gestoppt. Faustregel: Bei voll geöffnetem Hahn reicht die Leistung nicht ganz, bei halb bis dreiviertel offenem Hahn gerade so – und nur, solange der Verdichter mitläuft. Er schaltet in den WW-Ladungen der letzten 10 Tage bei ca. 44–46 °C Speichertemperatur wieder ab (Extremwerte 43,4 und 47,0 °C), meist nach 4–9 min, 13 min nur aus kaltem Speicher (31 °C). Danach bleiben ca. 9 kW DHC. Der Vorlauf liegt beim Abschalten konstant bei ca. 56–58 °C (9 Ladungen, Werte 55,5–58,6 °C), die Speichertemperatur streut dagegen. Der Verdichter schaltet also vermutlich wegen einer Vorlauf-/Hochdruckgrenze (HD 38,5 bar) ab und nicht wegen der Speichertemperatur. Die Hahnstellung ist aus dem Temperaturverlauf geschätzt, ein Durchflusssensor fehlt. Beobachtung: Geht der Bezug beim Vollbad weiter, kommt das Wasser erst wieder über ca. 46 °C, wenn der Hahn zu ist.
+Auswertung eines Vollbads (12.10.2026, 20:25–20:57, mit Bivalenz WW 40 °C): Der Speicher fiel von 50,4 °C auf 41,0 °C. In den ersten Minuten nach dem Zuschalten ist das Anlaufverzug (der Vorlauf stieg von 30 auf 54 °C in ca. 6 min, die Leistung stufenweise von 4 über 8,6 auf 11,5 kW). Mit DHC-Stufe 3 (ca. 15–16 kW Wärme inkl. Verdichter) wird der Abfall sehr flach, aber nicht gestoppt. Faustregel: Bei voll geöffnetem Hahn reicht die Leistung nicht ganz, bei halb bis dreiviertel offenem Hahn gerade so – und nur, solange der Verdichter mitläuft. Er schaltet in den WW-Ladungen der letzten 10 Tage bei ca. 44–46 °C Speichertemperatur wieder ab (Extremwerte 43,4 und 47,0 °C), meist nach 4–9 min, 13 min nur aus kaltem Speicher (31 °C). Danach bleiben ca. 9 kW DHC. Der Vorlauf liegt beim Abschalten konstant bei ca. 56–58 °C (9 Ladungen, Werte 55,5–58,6 °C), die Speichertemperatur streut dagegen. Der Verdichter schaltet also vermutlich wegen einer Vorlauf-/Hochdruckgrenze (HD 38,5 bar) ab und nicht wegen der Speichertemperatur. Die Hahnstellung ist aus dem Temperaturverlauf geschätzt, ein Durchflusssensor fehlt. Beobachtung: Geht der Bezug beim Vollbad weiter, kommt das Wasser erst wieder über ca. 46 °C, wenn der Hahn zu ist.
 
 Nachverfolgung in Home Assistant über `sensor.wp_energie_warmwasser`, `sensor.wp_energie_heizen`, `sensor.wp_energie_standby` und `sensor.wp_energie_heizstab_aktiv` (seit 16.10.2026).
 
 ### WW-ECO
 aus 
-
-### WW Hysterese 
+10 °C (vorher 6 °C)
+Nachgeheizt wird erst bei Soll − 10 K (bei 55 °C also ab 45 °C). Das ist so, damit die Heizung effizient arbeiten kann, länger läuft und nicht ständig ein- bzw. ausschaltet. Abends ab 20:00 Uhr setzt die Automation „Heizung – WW-Hysterese Abendboost“ sie bis zum Ende der nächsten Ladung auf 1 K. Der Normalwert steht im Helfer `input_number.default_hysterese`
 6 °C
 Darf kühlen bis 44 °C, bevor neu geheizt wird. Das ist so, damit die Heizung effizient arbeiten kann, länger läuft und nicht ständig ein- bzw. ausschaltet.
 

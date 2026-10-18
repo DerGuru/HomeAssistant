@@ -1546,3 +1546,47 @@
       entity_id: switch.bad_eg_spiegellicht_bad_eg
   mode: queued
   max: 5
+- id: '1792313316323'
+  alias: Heizung – WW-Hysterese Abendboost
+  description: '20:00: WW-Hysterese auf 1 K, damit der Speicher abends bei ca. 54
+    °C nachlädt (Soll 55 °C). Sobald die Warmwasserbereitung danach wieder aus ist,
+    Hysterese zurück auf input_number.default_hysterese. Nicht während des Legionellenprogramms.'
+  triggers:
+  - at: '20:00:00'
+    id: abend_start
+    trigger: time
+  - entity_id: binary_sensor.heizung_warmwasserbereitung
+    from: 'on'
+    id: ladung_fertig
+    to: 'off'
+    trigger: state
+  conditions: []
+  actions:
+  - choose:
+    - alias: 20:00 – Hysterese auf 1 K
+      conditions:
+      - condition: trigger
+        id: abend_start
+      sequence:
+      - action: number.set_value
+        data:
+          value: 1
+        target:
+          entity_id: number.heizung_ww_hysterese
+    - alias: Ladung fertig – Hysterese zurück auf Default
+      conditions:
+      - condition: trigger
+        id: ladung_fertig
+      - condition: numeric_state
+        entity_id: number.heizung_ww_hysterese
+        below: input_number.default_hysterese
+      - condition: state
+        entity_id: script.legionellenprogramm_warmwasser
+        state: 'off'
+      sequence:
+      - action: number.set_value
+        data:
+          value: '{{ states(''input_number.default_hysterese'') | float(10) }}'
+        target:
+          entity_id: number.heizung_ww_hysterese
+  mode: queued

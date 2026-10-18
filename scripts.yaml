@@ -310,14 +310,14 @@ bewasserung_kreis_ausfuhren:
   description: ''
 legionellenprogramm_warmwasser:
   alias: Legionellenprogramm Warmwasser
-  description: Hebt Warmwasser auf Legionellentemperatur, wartet bis mindestens 61
+  description: Hebt Warmwasser auf Legionellentemperatur, wartet bis mindestens 60
     °C erreicht sind, hält 30 Minuten und stellt danach die normalen Werte wieder
     her.
   mode: single
   variables:
     LegioTemp: 59
     LegioHyst: 1
-    DefaultHyst: 3
+    DefaultHyst: '{{ states(''input_number.default_hysterese'') | float(10) }}'
   sequence:
   - alias: WW-Sollwerte auf Legionellenbetrieb setzen
     action: input_number.set_value
@@ -331,9 +331,9 @@ legionellenprogramm_warmwasser:
       entity_id: number.heizung_ww_hysterese
     data:
       value: '{{ LegioHyst }}'
-  - alias: Maximal 1 Stunde warten bis Speicher mindestens 61 °C erreicht
+  - alias: Maximal 1 Stunde warten bis Speicher mindestens 60 °C erreicht
     wait_template: '{{ states(''sensor.heizung_speicheristtemp'') | float(-999) >=
-      LegioTemp }}'
+      ( LegioTemp + LegioHyst) }}'
     timeout: 01:00:00
     continue_on_timeout: true
   - alias: Nur bei erreichter Temperatur 30 Minuten halten
@@ -354,7 +354,7 @@ legionellenprogramm_warmwasser:
     target:
       entity_id: input_number.currently_set_water_temp
     data:
-      value: '{{ states(''input_number.default_water_temp'') | float(46) }}'
+      value: '{{ states(''input_number.default_water_temp'') | float(50) }}'
 beetesprengen:
   sequence:
   - action: script.bewasserung_kreis_ausfuhren

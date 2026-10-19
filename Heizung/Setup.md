@@ -124,7 +124,7 @@ Hier ist der Heizbetrieb quasi ein Ersatz für die Anti-Legionellen-Funktion der
 Wir haben keine Zirkulation im WW-Kreis. Wenn der Hahn geöffnet wird, dann läuft erst mal einen Moment kaltes Wasser.
 
 ### Sollwerte
-Der WW-Sollwert wird **dynamisch aus Home Assistant** gesetzt (Details unter „Sollwert-Steuerung über Home Assistant“). Aktuell **55 °C im Betrieb mit 10 K Hysterese** (reheizt ab 45 °C; Versuch seit 18.10.2026, vorher 50 °C mit 6 K Hysterese). Abends ab 20:00 Uhr gilt bis zum Ende der nächsten Ladung 1 K Hysterese (siehe „Abend-Hysterese (Abendboost)“).
+Der WW-Sollwert wird **dynamisch aus Home Assistant** gesetzt (Details unter „Sollwert-Steuerung über Home Assistant“). Aktuell **50 °C im Betrieb mit 5 K Hysterese** (reheizt ab 45 °C; seit 19.10.2026, davor 18.–19.10.2026 Versuch mit 55 °C / 10 K, ursprünglich 50 °C / 6 K). Abends ab 20:00 Uhr gilt bis zum Ende der nächsten Ladung 1 K Hysterese (siehe „Abend-Hysterese (Abendboost)“).
 
 ### Regelzeiten (FEK)
 Mo 03:00 - 4:30
@@ -136,7 +136,7 @@ Seit August 2026 gibt es eine zusätzliche Steuerungsebene in Home Assistant, di
 
 Statt Automationen direkt auf die drei Sollwert-Entities (`number.heizung_speichersolltemp`, `number.heizung_ww_komf_temp`, `number.heizung_ww_eco_temp`) schreiben zu lassen, gibt es zwei `input_number`-Helfer:
 
-- **`input_number.default_water_temp`** („Default Water Temp“): der manuell gepflegte Normalwert (Startwert 46 °C, aktuell 55 °C).
+- **`input_number.default_water_temp`** („Default Water Temp“): der manuell gepflegte Normalwert (Startwert 46 °C, aktuell 50 °C).
 - **`input_number.currently_set_water_temp`** („Currently Set Water Temp“): der gerade aktive Sollwert.
 
 Eine einzige Automation (`Heizung – WW-Solltemperatur übernehmen`) beobachtet `currently_set_water_temp` und überträgt jede Änderung per `number.set_value` auf alle drei realen Entities. Das ist die **einzige** Stelle, die die drei Hardware-Entities noch direkt anfasst – alle anderen Automationen/Skripte schreiben nur noch den Helferwert.
@@ -154,9 +154,9 @@ Die Automation `Heizung – Warmwasser Anwesenheit` reagiert auf die Presence-Gr
 
 Ziel: Zu Beginn der Badezeit soll der Speicher möglichst voll sein. Dafür gibt es:
 
-- **`input_number.default_hysterese`** („Default Hysterese“, Schieberegler 1–10 K, Schritt 0,5, aktuell 10 K): der Normalwert der WW-Hysterese (`number.heizung_ww_hysterese`). Die Abend-Automation und das Legionellenprogramm lesen ihn direkt von hier.
+- **`input_number.default_hysterese`** („Default Hysterese“, Schieberegler 1–10 K, Schritt 0,5, aktuell 5 K): der Normalwert der WW-Hysterese (`number.heizung_ww_hysterese`). Die Abend-Automation und das Legionellenprogramm lesen ihn direkt von hier.
 - **Automation `Heizung – WW-Hysterese Abendboost`** (Modus `queued`):
-  - **20:00 Uhr:** `number.heizung_ww_hysterese` wird auf 1 K gesetzt, der Speicher lädt dann schon ab Soll − 1 K nach (bei 55 °C ab 54 °C).
+  - **20:00 Uhr:** `number.heizung_ww_hysterese` wird auf 1 K gesetzt, der Speicher lädt dann schon ab Soll − 1 K nach (bei 50 °C ab 49 °C).
   - **Warmwasserbereitung aus** (`binary_sensor.heizung_warmwasserbereitung` von `on` auf `off`): Die Hysterese geht zurück auf den Wert von `default_hysterese`. Das passiert nur, wenn sie gerade unter dem Default liegt und das Legionellenprogramm nicht läuft.
   - Ist der Speicher um 20:00 Uhr bereits über Soll − 1 K, startet keine Ladung. Die Hysterese bleibt dann bei 1 K, bis die nächste Ladung durch ist (durch Standby-Verluste nach wenigen Stunden).
 
@@ -223,11 +223,6 @@ Der Druck wurde von einem Tecalor Techniker empfohlen und *sollte* nicht übesch
 ### Frostschutz
 4 °C.
 
--20 °C (Versuch seit 18.10.2026, vorher 40 °C)
-
-Mit -20 °C (Werkseinstellung) schaltet die DHC nicht mehr parallel zum Verdichter zu. Sie übernimmt trotzdem immer, sobald der Verdichter an der Vorlaufgrenze (ca. 56–58 °C) abschaltet. Beobachtet am 18.10.2026 (Soll 55 °C): Der Verdichter lief 7,6 min allein und schaltete bei 56,5 °C Vorlauf und ca. 49 °C Speicher ab. Danach folgten NHZ1, NHZ2 und NHZ3 im 2-Minuten-Takt bis zum Sollwert. Die Ladung von 48,1 auf 55,0 °C dauerte 23 min und brauchte 2,29 kWh, davon 1,96 kWh bei laufender DHC. Gemessen wird über den Shelly (`sensor.heizenergie_power`), zugeordnet über die Template-Sensoren `sensor.wp_leistung_*`. Zum Vergleich: Eine Ladung von 44 auf 49,7 °C mit den alten Werten brauchte 2,06–2,14 kWh. Die Untergrenze für das Nachheizen liegt mit 45 °C kaum über den vorherigen 44 °C, der größere Puffer gilt also vor allem kurz nach einer Ladung. Noch nicht ausgewertet: mehrere Zyklen mit 10 K Hysterese und das Verhalten bei einem Vollbad.
-
-Vorher (Bivalenz WW 40 °C): Bewusst so eingestellt. Der Wert ist laut Handbuch eine **Außentemperatur** (Bereich -20 °C bis 30 °C, Werkseinstellung -20 °C): darunter schaltet die Zusatzheizung (DHC) bei der Warmwasserbereitung lastabhängig zu. Mit 40 °C war
 ### Bivalenz Heizung
 -20 °C
 
@@ -235,9 +230,13 @@ Vorher (Bivalenz WW 40 °C): Bewusst so eingestellt. Der Wert ist laut Handbuch 
 aus
 
 ### Bivalenz WW
-40 °C 
+-20 °C (Werkseinstellung; seit 18.10.2026, vorher 40 °C)
 
-Bewusst so eingestellt. Der Wert ist laut Handbuch eine **Außentemperatur** (Bereich -20 °C bis 30 °C, Werkseinstellung -20 °C): darunter schaltet die Zusatzheizung (DHC) bei der Warmwasserbereitung lastabhängig zu. Mit 40 °C ist das also **immer** der Fall.
+Stand 19.10.2026: WW-Soll wieder 50 °C und Hysterese 5 K (inkl. Default-Helfer), Bivalenz WW bleibt bei -20 °C. Zur späteren Kontrolle: Beschwerden über zu wenig Warmwasser (v. a. Vollbad) beobachten.
+
+Mit -20 °C (Werkseinstellung) schaltet die DHC nicht mehr parallel zum Verdichter zu. Sie übernimmt trotzdem immer, sobald der Verdichter an der Vorlaufgrenze (ca. 56–58 °C) abschaltet. Beobachtet am 18.10.2026 (Soll 55 °C): Der Verdichter lief 7,6 min allein und schaltete bei 56,5 °C Vorlauf und ca. 49 °C Speicher ab. Danach folgten NHZ1, NHZ2 und NHZ3 im 2-Minuten-Takt bis zum Sollwert. Die Ladung von 48,1 auf 55,0 °C dauerte 23 min und brauchte 2,29 kWh, davon 1,96 kWh bei laufender DHC. Gemessen wird über den Shelly (`sensor.heizenergie_power`), zugeordnet über die Template-Sensoren `sensor.wp_leistung_*`. Zum Vergleich: Eine Ladung von 44 auf 49,7 °C mit den alten Werten brauchte 2,06–2,14 kWh. Die Untergrenze für das Nachheizen liegt mit 45 °C kaum über den vorherigen 44 °C, der größere Puffer gilt also vor allem kurz nach einer Ladung. Noch nicht ausgewertet: mehrere Zyklen mit 10 K Hysterese und das Verhalten bei einem Vollbad.
+
+Vorher (bis 18.10.2026) stand Bivalenz WW auf 40 °C. Bewusst so eingestellt. Der Wert ist laut Handbuch eine **Außentemperatur** (Bereich -20 °C bis 30 °C, Werkseinstellung -20 °C): darunter schaltet die Zusatzheizung (DHC) bei der Warmwasserbereitung lastabhängig zu. Mit 40 °C ist das also **immer** der Fall.
 
 Grund: Komfort beim Vollbad. Wegen der Stillstandzeit (20 min) kann der Verdichter während eines langen Wasserbezugs nicht sofort wieder anlaufen – ohne Zusatzheizung kam am Ende des Vollbads nur noch lauwarmes Wasser. Hier tausche ich bewusst Geld gegen Komfort (und Frieden).
 
@@ -249,10 +248,9 @@ Nachverfolgung in Home Assistant über `sensor.wp_energie_warmwasser`, `sensor.w
 
 ### WW-ECO
 aus 
-10 °C (vorher 6 °C)
-Nachgeheizt wird erst bei Soll − 10 K (bei 55 °C also ab 45 °C). Das ist so, damit die Heizung effizient arbeiten kann, länger läuft und nicht ständig ein- bzw. ausschaltet. Abends ab 20:00 Uhr setzt die Automation „Heizung – WW-Hysterese Abendboost“ sie bis zum Ende der nächsten Ladung auf 1 K. Der Normalwert steht im Helfer `input_number.default_hysterese`
-6 °C
-Darf kühlen bis 44 °C, bevor neu geheizt wird. Das ist so, damit die Heizung effizient arbeiten kann, länger läuft und nicht ständig ein- bzw. ausschaltet.
+5 °C (seit 19.10.2026; 18.–19.10.2026 Versuch mit 10 °C, davor 6 °C)
+
+Nachgeheizt wird erst bei Soll − 5 K (bei 50 °C also ab 45 °C). Das ist so, damit die Heizung effizient arbeiten kann, länger läuft und nicht ständig ein- bzw. ausschaltet. Abends ab 20:00 Uhr setzt die Automation „Heizung – WW-Hysterese Abendboost“ sie bis zum Ende der nächsten Ladung auf 1 K. Der Normalwert steht im Helfer `input_number.default_hysterese`.
 
 ### Warmwasserkorrektur 
 3 °C

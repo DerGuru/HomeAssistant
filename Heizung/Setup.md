@@ -384,7 +384,7 @@ Das Arbeitszimmer EG soll vom Thermostat im Heizbetrieb auf einer Zieltemperatur
 Statt Logik in jeder Raum-Automation zu duplizieren, gibt es einen zentralen Dispatcher, der pro Raum mit dem jeweiligen ZBMINI-Switch aufgerufen wird:
 
 - wertet `sensor.heizungsbetriebsmodus` aus und ruft je nach Modus ein Sub-Skript auf:
-  - **Heizbetrieb** (`heizkreisventilsteuerung_heating`): prüft per `any_window_open`, ob im Raum ein Fenster offen ist; wenn ja wird das Thermostat per `climate.set_hvac_mode` auf `off` gestellt, sonst auf `heat`.
+  - **Heizbetrieb** (`heizkreisventilsteuerung_heating`): Das Thermostat bleibt immer auf `heat` (im Zustand `off` meldet es keine Temperatur mehr). Per `any_window_open` wird geprüft, ob im Raum ein Fenster offen ist. Bei offenem Fenster wird das Relais detached und ausgeschaltet (Ventil zu), bei geschlossenem Fenster wieder attached und passend zu `hvac_action` gesetzt. Der Frostschutz bei offenem Fenster steht unter „Frostschutz-Puls“.
   - **Kühlbetrieb** (`heizkreisventilsteuerung_cooling`): schließt das Ventil (Relais aus), wenn ein Fenster durchgehend länger als 5 Minuten offen ist (Schimmelschutz), sonst bleibt/wird das Relais eingeschaltet.
 - Kein Rohsignal-Handling mehr über einen L/N-Kontakt – die Thermostate sind reguläre `climate`-Entities (Zigbee, eigener ZHA-Quirk).
 
@@ -405,6 +405,20 @@ Wechselt `sensor.heizungsbetriebsmodus`, schaltet diese Automation das Bad-OG-Re
 ### Start-Synchronisation (`Heizung – HA-Start Sync`)
 
 Beim Hochfahren von Home Assistant wartet diese Automation (max. 15 Minuten) bis Vor-/Rücklauf-Sensoren und alle Heizkreis-Relais verfügbar sind, bevor sie den initialen Zustand setzt (Bad OG direkt, alle anderen über `setheizkreisventilebetriebsmodus`). Bei Timeout wird ein Fehler ins System-Log geschrieben und die Automation bricht ab.
+
+### Frostschutz-Puls bei offenem Fenster (`blueprints/automation/heizkreis_frostschutz.yaml`)
+
+Ziel: Bei offenem Fenster (zum Beispiel nachts bei Frost) sollen Raum und Boden nicht zu stark auskühlen, ohne dass das Ventil dauerhaft offen bleibt.
+
+- Eine Instanz je Raum: Schlafzimmer, Kinderzimmer, Arbeitszimmer OG, Arbeitszimmer EG (Bad OG ist ein Sonderfall und nicht dabei).
+- **Bedingung:** Heizbetrieb, Detach-Relay an (= Fenster offen) und Raumtemperatur (`sensor.thermostat*_raumtemperatur`) liegt seit 5 min unter der Grenze.
+- **Grenze je Raum als Helfer:** `input_number.frostschutz_grenze_schlafzimmer`, `_kinderzimmer`, `_arbeitszimmer_og`, `_arbeitszimmer_eg` (5–20 °C, aktuell 15 °C).
+- **Ablauf:** Das Ventil öffnet und bleibt offen, bis ein Heizlauf des Verdichters (ohne Warmwasser) zu Ende ist. Läuft der Verdichter gerade nicht, wird erst sein nächster Lauf abgewartet. Es bleibt aber mindestens 10 min offen, auch wenn der Verdichter früher ausgeht. Danach bleibt es 30 min geschlossen. Mindestdauer, Pause und eine Höchstdauer von 90 min (je Schritt, als Sicherheit) sind Blueprint-Eingaben. Wird das Fenster geschlossen, bricht der Ablauf ab und die Heizkreis-Skripte setzen das Relais wieder.
+- **Heizlauf:** `binary_sensor.heizung_heizlauf` (Template-Helfer) ist an, wenn `binary_sensor.heizung_verdichter` an und `binary_sensor.heizung_warmwasserbereitung` aus ist.
+- **Messung (Nacht zum 06.11.2026):** Ein manuell geöffnetes Ventil (Schlafzimmer) zeigte im Rücklauf-Ist nach etwa 3 min eine Wirkung, nach 3,5 bis 4,5 min die stärkste. Das ist die Trägheit des thermischen Aktors.
+- Geprüft wird alle 5 min, daher beginnt ein Puls bis zu 5 min nach dem Unterschreiten der Grenze.
+- Der Sollwert des Thermostats wird dabei nicht verändert und muss nicht zwischengespeichert werden.
+- Der Thermostat-eigene Frostschutz (Bedarf bei ≤ 5 °C) wirkt im detachten Zustand nicht, der Schutz hängt dann an Home Assistant.
 
 ### Automation Bad OG
 

@@ -1,0 +1,171 @@
+blueprint:
+  name: Heizkreis Frostschutz-Puls
+  description: >
+    Verhindert bei offenem Fenster ein zu starkes Auskuehlen von Raum und
+    Boden. Ist im Heizbetrieb das Heizkreis-Relay detached (Fenster offen,
+    Ventil geschlossen) und die Raumtemperatur liegt laenger als die
+    eingestellte Zeit unter der Grenze, wird das Ventil geoeffnet und bleibt
+    offen, bis ein Heizlauf des Verdichters (ohne Warmwasser) zu Ende ist,
+    mindestens aber die Mindestdauer. Danach bleibt es die Pausenzeit lang
+    geschlossen. Die Grenze liegt je Raum in einem input_number-Helfer.
+  domain: automation
+  input:
+    temperature_sensor:
+      name: Raumtemperatur
+      description: Raumlufttemperatur des Raumes.
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    limit:
+      name: Temperaturgrenze (Helfer)
+      description: input_number mit der Grenze, unter der das Ventil pulsiert.
+      selector:
+        entity:
+          domain: input_number
+    zbmini_switch:
+      name: ZBMINI Heizkreis-Switch
+      description: Relay, das das Heizkreisventil schaltet.
+      selector:
+        entity:
+          domain: switch
+    detach_switch:
+      name: ZBMINI Detach-Relay
+      description: Detach-Schalter desselben ZBMINI (an = Fenster offen im Heizbetrieb).
+      selector:
+        entity:
+          domain: switch
+    stable_minutes:
+      name: Wartezeit unter der Grenze (Minuten)
+      description: So lange muss die Temperatur unter der Grenze liegen, bevor gepulst wird.
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: min
+    heating_run:
+      name: Heizlauf des Verdichters
+      description: Binary-Sensor, der an ist, solange der Verdichter fuer die Heizung laeuft (nicht fuer Warmwasser).
+      default: binary_sensor.heizung_heizlauf
+      selector:
+        entity:
+          domain: binary_sensor
+    min_minutes:
+      name: Mindestdauer (Minuten)
+      description: So lange bleibt das Ventil mindestens offen, auch wenn der Heizlauf frueher endet.
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: min
+    max_minutes:
+      name: Hoechstdauer (Minuten)
+      description: Sicherheitsgrenze fuer das Warten auf den Heizlauf und fuer den Heizlauf selbst (je Schritt).
+      default: 90
+      selector:
+        number:
+          min: 10
+          max: 240
+          unit_of_measurement: min
+    pause_minutes:
+      name: Pause nach dem Puls (Minuten)
+      description: So lange bleibt das Ventil nach einem Puls mindestens geschlossen.
+      default: 30
+      selector:
+        number:
+          min: 1
+          max: 240
+          unit_of_measurement: min
+
+mode: single
+max_exceeded: silent
+
+triggers:
+  - trigger: numeric_state
+    entity_id: !input temperature_sensor
+    below: !input limit
+    for:
+      minutes: !input stable_minutes
+  - trigger: state
+    entity_id: !input detach_switch
+    to: "on"
+  - trigger: time_pattern
+    minutes: "/5"
+
+conditions:
+  - condition: state
+    entity_id: sensor.heizungsbetriebsmodus
+    state: Heating
+  - condition: state
+    entity_id: !input detach_switch
+    state: "on"
+  - condition: numeric_state
+    entity_id: !input temperature_sensor
+    below: !input limit
+
+actions:
+  - action: switch.turn_on
+    target:
+      entity_id: !input zbmini_switch
+  # Mindestdauer und Heizlauf laufen parallel, das Ventil schliesst erst, wenn beides fertig ist.
+  - parallel:
+      - delay:
+          minutes: !input min_minutes
+      - sequence:
+          - if:
+              - condition: state
+                entity_id: !input heating_run
+                state: "off"
+            then:
+              - wait_for_trigger:
+                  - trigger: state
+                    entity_id: !input heating_run
+                    to: "on"
+                  - trigger: state
+                    entity_id: !input detach_switch
+                    to: "off"
+                  - trigger: state
+                    entity_id: sensor.heizungsbetriebsmodus
+                    to: Cooling
+                timeout:
+                  minutes: !input max_minutes
+                continue_on_timeout: true
+          - if:
+              - condition: state
+                entity_id: !input heating_run
+                state: "on"
+            then:
+              - wait_for_trigger:
+                  - trigger: state
+                    entity_id: !input heating_run
+                    to: "off"
+                  - trigger: state
+                    entity_id: !input detach_switch
+                    to: "off"
+                  - trigger: state
+                    entity_id: sensor.heizungsbetriebsmodus
+                    to: Cooling
+                timeout:
+                  minutes: !input max_minutes
+                continue_on_timeout: true
+  # Nach Fensterschluss oder Moduswechsel regeln die Heizkreis-Skripte das Relay selbst.
+  - if:
+      - condition: state
+        entity_id: sensor.heizungsbetriebsmodus
+        state: Heating
+      - condition: state
+        entity_id: !input detach_switch
+        state: "on"
+    then:
+      - action: switch.turn_off
+        target:
+          entity_id: !input zbmini_switch
+      - wait_for_trigger:
+          - trigger: state
+            entity_id: !input detach_switch
+            to: "off"
+        timeout:
+          minutes: !input pause_minutes
+        continue_on_timeout: true

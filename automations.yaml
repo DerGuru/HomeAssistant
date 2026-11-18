@@ -90,7 +90,7 @@
   description: ''
   triggers:
   - trigger: state
-    entity_id: binary_sensor.shellypresence_ccba97ee8f1c_room_occupancy
+    entity_id: binary_sensor.arbeitszimmer_eg_prasenzsensor
     to: 'on'
   conditions: []
   actions:
@@ -117,11 +117,11 @@
         - condition: or
           conditions:
           - condition: state
-            entity_id: sensor.shellypresence_ccba97ee8f1c_illuminance_level
+            entity_id: sensor.arbeitszimmer_eg_prasenzsensor_illuminance_level
             state:
             - twilight
           - condition: state
-            entity_id: sensor.shellypresence_ccba97ee8f1c_illuminance_level
+            entity_id: sensor.arbeitszimmer_eg_prasenzsensor_illuminance_level
             state:
             - bright
       sequence:
@@ -139,7 +139,7 @@
   description: ''
   triggers:
   - trigger: state
-    entity_id: binary_sensor.shellypresence_ccba97ee8f1c_room_occupancy
+    entity_id: binary_sensor.arbeitszimmer_eg_prasenzsensor
     to: 'off'
     for:
       seconds: 10

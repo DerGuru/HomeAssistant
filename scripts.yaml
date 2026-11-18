@@ -1,5 +1,15 @@
+roborock_return_to_base:
+  alias: Roborock Return To Base
+  description: Schickt den Roborock zur Ladestation. Direkt ueber die HomeKit-Bridge aus Apple Home aufrufbar.
+  icon: mdi:robot-vacuum
+  mode: single
+  sequence:
+  - action: vacuum.return_to_base
+    target:
+      entity_id: vacuum.roborock_s8_pro_ultra
+    data: {}
 tts_with_volume:
-  alias: TTS_with_Volume
+  alias: TTS mit Lautstärke
   description: Speichert die aktuelle Lautstärke, erhöht sie, gibt aus und setzt auf
     Original zurück
   mode: queued
@@ -55,7 +65,7 @@ tts_with_volume:
       volume_level: '{{ initial_volume }}'
     action: media_player.volume_set
 heizkreisventilsteuerung:
-  alias: HeizkreisVentilSteuerung
+  alias: Heizkreis – Ventilsteuerung
   description: Dispatcher, der je nach Betriebsmodus die Heiz- oder Kuehllogik fuer
     ein Heizkreisventil aufruft.
   mode: queued
@@ -84,9 +94,10 @@ heizkreisventilsteuerung:
         data:
           zbmini_entity: '{{ zbmini_entity }}'
 heizkreisventilsteuerung_heating:
-  alias: HeizkreisVentilSteuerung Heating
-  description: Steuert das Thermostat eines Heizkreisventils im Heizbetrieb - aus
-    bei offenem Fenster, sonst heizen.
+  alias: Heizkreis – Ventilsteuerung Heizen
+  description: 'Heizbetrieb: Thermostat bleibt immer auf heat. Bei offenem Fenster
+    wird das Relay detached und das Ventil geschlossen (Frostschutz-Puls siehe Blueprint
+    heizkreis_frostschutz), bei geschlossenem Fenster wieder attached.'
   mode: queued
   max: 32
   fields:
@@ -98,6 +109,7 @@ heizkreisventilsteuerung_heating:
     area: '{{ area_id(zbmini_entity) }}'
     thermostat: '{{ expand(area_entities(area)) | selectattr(''domain'',''eq'',''climate'')
       | map(attribute=''entity_id'') | list | first }}'
+    detached: switch.{{ zbmini_entity.split('.')[1] }}_detach_relay
   sequence:
   - condition: template
     value_template: '{{ area is not none }}'
@@ -107,27 +119,61 @@ heizkreisventilsteuerung_heating:
     data:
       area: '{{ area }}'
     response_variable: window
+  - if:
+    - condition: template
+      value_template: '{{ not is_state(thermostat, ''heat'') }}'
+    then:
+    - action: climate.set_hvac_mode
+      continue_on_error: true
+      target:
+        entity_id: '{{ thermostat }}'
+      data:
+        hvac_mode: heat
   - choose:
     - conditions:
       - condition: template
         value_template: '{{ window.open }}'
       sequence:
-      - action: climate.set_hvac_mode
-        target:
-          entity_id: '{{ thermostat }}'
-        data:
-          hvac_mode: 'off'
+      - if:
+        - condition: template
+          value_template: '{{ is_state(detached, ''off'') }}'
+        then:
+        - action: switch.turn_on
+          target:
+            entity_id: '{{ detached }}'
+          data: {}
+        - action: switch.turn_off
+          target:
+            entity_id: '{{ zbmini_entity }}'
+          data: {}
     - conditions:
       - condition: template
         value_template: '{{ not window.open }}'
       sequence:
-      - action: climate.set_hvac_mode
-        target:
-          entity_id: '{{ thermostat }}'
-        data:
-          hvac_mode: heat
+      - if:
+        - condition: template
+          value_template: '{{ is_state(detached, ''on'') }}'
+        then:
+        - action: switch.turn_off
+          target:
+            entity_id: '{{ detached }}'
+          data: {}
+        - if:
+          - condition: template
+            value_template: '{{ is_state_attr(thermostat, ''hvac_action'', ''heating'')
+              }}'
+          then:
+          - action: switch.turn_on
+            target:
+              entity_id: '{{ zbmini_entity }}'
+            data: {}
+          else:
+          - action: switch.turn_off
+            target:
+              entity_id: '{{ zbmini_entity }}'
+            data: {}
 heizkreisventilsteuerung_cooling:
-  alias: HeizkreisVentilSteuerung Cooling
+  alias: Heizkreis – Ventilsteuerung Kühlen
   description: Schliesst im Kuehlbetrieb den Heizkreis (ZBMINI aus) - als Schimmelschutz.
   mode: parallel
   max: 32
@@ -160,7 +206,7 @@ heizkreisventilsteuerung_cooling:
         entity_id: '{{ zbmini_entity }}'
       data: {}
 any_window_open:
-  alias: AnyWindowOpen
+  alias: Fenster – Offene Fenster im Bereich prüfen
   description: Prueft, ob in einer Area mindestens ein Fenster geoeffnet ist.
   mode: parallel
   max: 32
@@ -209,7 +255,7 @@ playmedia:
     data:
       volume_level: '{{ initial_volume }}'
     action: media_player.volume_set
-  alias: PlayMedia
+  alias: Medien abspielen
   description: Speichert die aktuelle Lautstärke, erhöht sie, gibt aus und setzt auf
     Original zurück
   mode: parallel
@@ -235,7 +281,7 @@ playmedia:
           step: 0.05
       default: 0.8
 setheizkreisventilebetriebsmodus:
-  alias: SetHeizkreisventileBetriebsmodus
+  alias: Heizkreis – Betriebsmodus setzen
   description: Setzt Detached und das Relay aller Heizkreisventile, die von einem
     Thermostat gesteuert werden und evaluiert danach den Fenster-Zustand für einen
     Sync.
@@ -290,7 +336,7 @@ setheizkreisventilebetriebsmodus:
         data:
           zbmini_entity: '{{ repeat.item }}'
 bewasserung_kreis_ausfuhren:
-  alias: Bewässerung Kreis ausführen
+  alias: Garten – Bewässerung Kreis ausführen
   mode: queued
   max: 10
   fields:
@@ -309,7 +355,7 @@ bewasserung_kreis_ausfuhren:
       entity_id: '{{ ventil }}'
   description: ''
 legionellenprogramm_warmwasser:
-  alias: Legionellenprogramm Warmwasser
+  alias: Heizung – Legionellenprogramm Warmwasser
   description: Hebt Warmwasser auf Legionellentemperatur, wartet bis mindestens 60
     °C erreicht sind, hält 30 Minuten und stellt danach die normalen Werte wieder
     her.
@@ -359,40 +405,40 @@ beetesprengen:
   - action: script.bewasserung_kreis_ausfuhren
     metadata: {}
     data:
-      ventil: valve.gartenpumpe_sprengerumshaus_switch_2
+      ventil: valve.garten_sprengerumshaus
       dauer_minuten: 20
-  alias: BeeteSprengen
+  alias: Garten – Beete sprengen
   description: ''
 fliederundhecke:
   sequence:
   - action: script.bewasserung_kreis_ausfuhren
     metadata: {}
     data:
-      ventil: valve.sprenger1_hecke_sprenger1_hecke
+      ventil: valve.garten_sprenger1_hecke
       dauer_minuten: 30
-  alias: FliederUndHecke
+  alias: Garten – Flieder und Hecke sprengen
   description: ''
 rasensprengen:
   sequence:
   - action: script.bewasserung_kreis_ausfuhren
     data:
-      ventil: valve.sprenger2_gruenerweg_sprenger2_gruenerweg
+      ventil: valve.garten_sprenger2_gruenerweg
       dauer_minuten: 30
   - action: script.bewasserung_kreis_ausfuhren
     data:
-      ventil: valve.sprenger3_veranda_sprenger3_veranda
+      ventil: valve.garten_sprenger3_veranda
       dauer_minuten: 30
     enabled: true
-  alias: RasenSprengen
+  alias: Garten – Rasen sprengen
   description: ''
 wascheplatz:
   sequence:
   - action: script.bewasserung_kreis_ausfuhren
     metadata: {}
     data:
-      ventil: valve.sprenger4_hochbeet_sprenger4_hochbeet
+      ventil: valve.garten_sprenger4_hochbeet
       dauer_minuten: 30
-  alias: Wäscheplatz
+  alias: Garten – Wäscheplatz sprengen
   description: ''
 heizung_programmziel_bestimmen:
   alias: Heizung – Programmziel bestimmen
@@ -473,3 +519,22 @@ heizung_programmziel_bestimmen:
       data:
         option: Programm
   mode: single
+gute_nacht:
+  alias: AllesAus
+  description: Schaltet alle Lichter im Haus aus, außer dem Spiegellicht im Flur EG.
+    Für Apple Home / Siri.
+  icon: mdi:weather-night
+  mode: single
+  sequence:
+  - action: light.turn_off
+    target:
+      floor_id:
+      - erdgeschoss
+      - obergeschoss
+      - dachboden
+      - haus
+      exclude:
+        entity_id: light.spiegel
+        area_id:
+        - heizung
+    data: {}

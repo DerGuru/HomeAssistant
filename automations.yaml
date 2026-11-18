@@ -4,10 +4,10 @@
     ist. Sie lässt dabei gerne mal die Tür offen und es wird im ganzen Haus kalt.
   triggers:
   - trigger: state
-    entity_id: binary_sensor.bthome_sensor_ab88_window
+    entity_id: binary_sensor.arbeitszimmer_og_fenster_window
     to: 'on'
   - trigger: state
-    entity_id: binary_sensor.bthome_sensor_718d_window
+    entity_id: binary_sensor.arbeitszimmer_og_tur_window
     to: 'on'
   conditions:
   - condition: numeric_state
@@ -26,10 +26,10 @@
       - condition: and
         conditions:
         - condition: state
-          entity_id: binary_sensor.bthome_sensor_ab88_window
+          entity_id: binary_sensor.arbeitszimmer_og_fenster_window
           state: 'on'
         - condition: state
-          entity_id: binary_sensor.bthome_sensor_718d_window
+          entity_id: binary_sensor.arbeitszimmer_og_tur_window
           state: 'on'
       sequence:
       - action: script.tts_with_volume
@@ -49,10 +49,10 @@
     - condition: and
       conditions:
       - condition: state
-        entity_id: binary_sensor.bthome_sensor_ab88_window
+        entity_id: binary_sensor.arbeitszimmer_og_fenster_window
         state: 'on'
       - condition: state
-        entity_id: binary_sensor.bthome_sensor_718d_window
+        entity_id: binary_sensor.arbeitszimmer_og_tur_window
         state: 'on'
     then:
     - action: notify.mobile_app_aphone
@@ -65,7 +65,7 @@
   triggers:
   - trigger: state
     entity_id:
-    - input_boolean.binda
+    - group.alleda
     to:
     - 'off'
   conditions:
@@ -81,29 +81,9 @@
       message: '{{ fenster_msg }}'
       title: Fenster offen!
   variables:
-    fenster_msg: "{% set offene = expand('binary_sensor.fenster')\n  | selectattr('state',
-      'eq', 'on')\n  | map(attribute='name')\n  | list\n  | join(',\\n ') %}\n{{ offene
+    fenster_msg: "{{ expand('binary_sensor.fenster')\n  | selectattr('state', 'eq',
+      'on')\n  | map(attribute='entity_id')\n  | map('area_name')\n  | join('\\n')
       }}"
-  mode: single
-- id: '1758884336016'
-  alias: Roborock Return To Base
-  description: ''
-  triggers:
-  - trigger: state
-    entity_id:
-    - input_boolean.roborock_abbrechen
-    to: 'on'
-  conditions: []
-  actions:
-  - action: vacuum.return_to_base
-    target:
-      entity_id: vacuum.roborock_s8_pro_ultra
-    data: {}
-  - action: input_boolean.turn_off
-    metadata: {}
-    data: {}
-    target:
-      entity_id: input_boolean.roborock_abbrechen
   mode: single
 - id: '1758906112942'
   alias: Licht – Büro EG Arbeitslicht An
@@ -120,6 +100,38 @@
       - light.schreibtischlampe
       - light.arbeitszimmer_eg_schranklampe
     data: {}
+  - choose:
+    - conditions:
+      - condition: illuminance.is_value
+        target:
+          entity_id: sensor.arbeitszimmer_eg_fenster_illuminance
+        options:
+          for: 00:00:00
+          threshold:
+            type: below
+            value:
+              active_choice: number
+              number: 5
+      - condition: not
+        conditions:
+        - condition: or
+          conditions:
+          - condition: state
+            entity_id: sensor.shellypresence_ccba97ee8f1c_illuminance_level
+            state:
+            - twilight
+          - condition: state
+            entity_id: sensor.shellypresence_ccba97ee8f1c_illuminance_level
+            state:
+            - bright
+      sequence:
+      - action: light.turn_on
+        metadata: {}
+        target:
+          entity_id:
+          - light.arbeitszimmer_eg_jetstrom
+          - light.arbeitszimmer_eg_billy
+        data: {}
   mode: parallel
   max: 10
 - id: '1758906217471'
@@ -138,52 +150,6 @@
       area_id: arbeitszimmer
     data: {}
   mode: single
-- id: '1762360814601'
-  alias: Heizkreis – Bad OG
-  description: Öffnet bei Heizen, schließt bei Kühlen. Loggt Entscheidungen.
-  triggers:
-  - entity_id:
-    - sensor.heizungsbetriebsmodus
-    trigger: state
-  - event: start
-    trigger: homeassistant
-  - entity_id: switch.heizkreisbadog
-    trigger: state
-  actions:
-  - variables:
-      ventil: switch.heizkreisbadog
-      kuehl: '{{ is_state(''sensor.heizungsbetriebsmodus'',''Cooling'') }}'
-      ziel_an: '{{ not kuehl }}'
-  - choose:
-    - conditions:
-      - condition: template
-        value_template: '{{ ziel_an }}'
-      sequence:
-      - condition: template
-        value_template: '{{ is_state(ventil, ''off'') }}'
-      - target:
-          entity_id: '{{ ventil }}'
-        action: switch.turn_on
-        data: {}
-      - data:
-          name: HK Bad
-          message: Auf (kuehl={{ kuehl }}, ziel_an={{ ziel_an }})
-        action: logbook.log
-    - conditions:
-      - condition: template
-        value_template: '{{ not ziel_an }}'
-      sequence:
-      - condition: template
-        value_template: '{{ is_state(ventil, ''on'') }}'
-      - target:
-          entity_id: '{{ ventil }}'
-        action: switch.turn_off
-      - data:
-          name: HK Bad
-          message: Zu (kuehl={{ kuehl }}, ziel_an={{ ziel_an }})
-        action: logbook.log
-    default: []
-  mode: restart
 - id: '1764488924818'
   alias: Licht – Standardbeleuchtung
   description: ''
@@ -224,7 +190,15 @@
         metadata: {}
         data: {}
         target:
-          entity_id: light.standardbeleuchtung
+          floor_id:
+          - erdgeschoss
+          - obergeschoss
+          - dachboden
+          - haus
+          exclude:
+            entity_id:
+            - light.heizung_display_backlight
+            - light.spiegel
   mode: queued
   max: 10
 - id: '1764927919270'
@@ -252,9 +226,9 @@
   description: Heizkreis-Raumsteuerung via Blueprint
   use_blueprint:
     input:
-      thermostat: climate.thermostatburoeg
-      window_sensor: binary_sensor.bthome_sensor_e4e2_window
-      zbmini_switch: switch.heizkreisbueroeg
+      thermostat: climate.arbeitszimmer_eg_thermostat
+      window_sensor: binary_sensor.arbeitszimmer_eg_fenster_window
+      zbmini_switch: switch.arbeitszimmer_eg_heizkreisventil
     path: heizkreis_raumsteuerung.yaml
 - id: '1770570182202'
   alias: Licht – Schlafzimmer Sync
@@ -316,11 +290,11 @@
         state: Cooling
       sequence:
       - target:
-          entity_id: switch.heizkreisbadog
+          entity_id: switch.bad_og_heizkreisventil
         action: switch.turn_off
     default:
     - target:
-        entity_id: switch.heizkreisbadog
+        entity_id: switch.bad_og_heizkreisventil
       action: switch.turn_on
   - action: script.setheizkreisventilebetriebsmodus
     data: {}
@@ -332,13 +306,13 @@
   triggers:
   - trigger: state
     entity_id:
-    - binary_sensor.arbeitszimmer_eg_lichtschalter_az_eg_opening_1
+    - binary_sensor.arbeitszimmer_eg_lichtschalter_relais_1_opening
   conditions: []
   actions:
   - choose:
     - conditions:
       - condition: state
-        entity_id: binary_sensor.arbeitszimmer_eg_lichtschalter_az_eg_opening_1
+        entity_id: binary_sensor.arbeitszimmer_eg_lichtschalter_relais_1_opening
         state:
         - 'off'
       sequence:
@@ -359,27 +333,27 @@
   description: Heizkreis-Raumsteuerung via Blueprint
   use_blueprint:
     input:
-      thermostat: climate.thermostatburoog
-      window_sensor: binary_sensor.bthome_sensor_ab88_window
-      zbmini_switch: switch.heizkreisburoog
+      thermostat: climate.arbeitszimmer_og_thermostat
+      window_sensor: binary_sensor.arbeitszimmer_og_fenster_window
+      zbmini_switch: switch.arbeitszimmer_og_heizkreisventil
     path: heizkreis_raumsteuerung.yaml
 - id: '1770818884361'
   alias: Heizkreis – Kinderzimmer
   description: Heizkreis-Raumsteuerung via Blueprint
   use_blueprint:
     input:
-      thermostat: climate.thermostatkinderzimmer
+      thermostat: climate.kinderzimmer_thermostat
       window_sensor: binary_sensor.kinderzimmer_fenster
-      zbmini_switch: switch.heizkreiskinderzimmer
+      zbmini_switch: switch.kinderzimmer_heizkreisventil
     path: heizkreis_raumsteuerung.yaml
 - id: '1770818953369'
   alias: Heizkreis – Schlafzimmer
   description: Heizkreis-Raumsteuerung via Blueprint
   use_blueprint:
     input:
-      thermostat: climate.thermostatschlafzimmer
-      window_sensor: binary_sensor.schlafzimmerfenster_window
-      zbmini_switch: switch.heizkreisschlafzimmer
+      thermostat: climate.schlafzimmer_thermostat
+      window_sensor: binary_sensor.schlafzimmer_fenster_window
+      zbmini_switch: switch.schlafzimmer_heizkreisventil
     path: heizkreis_raumsteuerung.yaml
 - id: '1772186038644'
   alias: Heizung – HA-Start Sync
@@ -389,13 +363,13 @@
     trigger: homeassistant
   conditions: []
   actions:
-  - wait_template: "{{\n  states('sensor.vorlauf_heizkreis') not in ['unknown','unavailable','']\n
-      \ and states('sensor.rucklauf_heizkreis') not in ['unknown','unavailable','']\n
-      \ and states('switch.heizkreisbadog') not in ['unknown','unavailable','']\n
-      \ and states('switch.heizkreisbueroeg') not in ['unknown','unavailable','']\n
-      \ and states('switch.heizkreisburoog') not in ['unknown','unavailable','']\n
-      \ and states('switch.heizkreiskinderzimmer') not in ['unknown','unavailable','']\n
-      \ and states('switch.heizkreisschlafzimmer') not in ['unknown','unavailable','']\n}}"
+  - wait_template: "{{\n  states('sensor.heizung_vorlaufisttemp') not in ['unknown','unavailable','']\n
+      \ and states('sensor.heizung_ruecklaufisttemp') not in ['unknown','unavailable','']\n
+      \ and states('switch.bad_og_heizkreisventil') not in ['unknown','unavailable','']\n
+      \ and states('switch.arbeitszimmer_eg_heizkreisventil') not in ['unknown','unavailable','']\n
+      \ and states('switch.arbeitszimmer_og_heizkreisventil') not in ['unknown','unavailable','']\n
+      \ and states('switch.kinderzimmer_heizkreisventil') not in ['unknown','unavailable','']\n
+      \ and states('switch.schlafzimmer_heizkreisventil') not in ['unknown','unavailable','']\n}}"
     timeout: 00:15:00
     continue_on_timeout: true
   - choose:
@@ -421,11 +395,11 @@
         state: Cooling
       sequence:
       - target:
-          entity_id: switch.heizkreisbadog
+          entity_id: switch.bad_og_heizkreisventil
         action: switch.turn_off
     default:
     - target:
-        entity_id: switch.heizkreisbadog
+        entity_id: switch.bad_og_heizkreisventil
       action: switch.turn_on
   - action: script.setheizkreisventilebetriebsmodus
     data: {}
@@ -602,11 +576,11 @@
       - condition: valve.is_open
         target:
           entity_id:
-          - valve.gartenpumpe_sprengerumshaus_switch_2
-          - valve.sprenger1_hecke_sprenger1_hecke
-          - valve.sprenger2_gruenerweg_sprenger2_gruenerweg
-          - valve.sprenger3_veranda_sprenger3_veranda
-          - valve.sprenger4_hochbeet_sprenger4_hochbeet
+          - valve.garten_sprengerumshaus
+          - valve.garten_sprenger1_hecke
+          - valve.garten_sprenger2_gruenerweg
+          - valve.garten_sprenger3_veranda
+          - valve.garten_sprenger4_hochbeet
         options:
           behavior: any
           for: 00:00:00
@@ -615,11 +589,11 @@
         metadata: {}
         target:
           entity_id:
-          - valve.gartenpumpe_sprengerumshaus_switch_2
-          - valve.sprenger1_hecke_sprenger1_hecke
-          - valve.sprenger2_gruenerweg_sprenger2_gruenerweg
-          - valve.sprenger3_veranda_sprenger3_veranda
-          - valve.sprenger4_hochbeet_sprenger4_hochbeet
+          - valve.garten_sprengerumshaus
+          - valve.garten_sprenger1_hecke
+          - valve.garten_sprenger2_gruenerweg
+          - valve.garten_sprenger3_veranda
+          - valve.garten_sprenger4_hochbeet
         data: {}
     default:
     - action: script.fliederundhecke
@@ -635,43 +609,6 @@
       metadata: {}
       data: {}
   mode: restart
-- id: '1779792424456'
-  alias: Garten – BeeteSprengen
-  description: ''
-  triggers:
-  - trigger: numeric_state
-    entity_id:
-    - sensor.hochbeet_soil_moisture
-    below: 40
-    above: 1
-  - trigger: numeric_state
-    entity_id:
-    - sensor.rosenvordemhaus_soil_moisture
-    below: 40
-    above: 1
-  - trigger: sun
-    event: sunrise
-    offset: -01:00:00
-  conditions:
-  - condition: or
-    conditions:
-    - condition: numeric_state
-      entity_id: sensor.hochbeet_soil_moisture
-      above: 1
-      below: 40
-    - condition: numeric_state
-      entity_id: sensor.rosenvordemhaus_soil_moisture
-      above: 1
-      below: 40
-  actions:
-  - action: script.beetesprengen
-    data: {}
-  - delay:
-      hours: 2
-      minutes: 30
-      seconds: 0
-      milliseconds: 0
-  mode: single
 - id: '1779792917176'
   alias: Garten – Gartenpumpe an
   description: ''
@@ -696,7 +633,7 @@
   - action: valve.open_valve
     metadata: {}
     target:
-      entity_id: valve.gartenpumpe_sprengerumshaus_switch
+      entity_id: valve.garten_gartenpumpe
     data: {}
   mode: single
 - id: '1779792980507'
@@ -721,64 +658,22 @@
   - action: valve.close_valve
     metadata: {}
     target:
-      entity_id: valve.gartenpumpe_sprengerumshaus_switch
+      entity_id: valve.garten_gartenpumpe
     data: {}
   mode: restart
-- id: '1779794092082'
-  alias: Garten – Wäscheplatz
-  description: ''
-  triggers:
-  - trigger: sun
-    event: sunrise
-    offset: -01:00:00
-  conditions:
-  - condition: numeric_state
-    entity_id: sensor.rasenfeuchte_soil_moisture
-    above: 1
-    below: 40
-  actions:
-  - action: script.wascheplatz
-    data: {}
-  - delay:
-      hours: 2
-      minutes: 30
-      seconds: 0
-      milliseconds: 0
-  mode: single
-- id: '1779794458375'
-  alias: Garten – FliederUndHecke
-  description: ''
-  triggers:
-  - trigger: sun
-    event: sunrise
-    offset: -04:00:00
-  conditions:
-  - condition: numeric_state
-    entity_id: sensor.flieder_soil_moisture
-    above: 1
-    below: 40
-  actions:
-  - action: script.beetesprengen
-    data: {}
-  - delay:
-      hours: 2
-      minutes: 30
-      seconds: 0
-      milliseconds: 0
-  mode: single
 - id: '1781456750441'
   alias: Licht – Büro EG Billy
   description: ''
   triggers:
   - trigger: state
     entity_id:
-    - binary_sensor.arbeitszimmer_eg_lichtschalter_az_eg_opening_2
+    - binary_sensor.arbeitszimmer_eg_lichtschalter_relais_2_opening
   conditions: []
   actions:
   - choose:
     - conditions:
       - condition: state
-        entity_id: binary_sensor.arbeitszimmer_eg_lichtschalter_az_eg_opening_2
+        entity_id: binary_sensor.arbeitszimmer_eg_lichtschalter_relais_2_opening
         state:
         - 'off'
       sequence:
@@ -798,38 +693,6 @@
         - light.arbeitszimmer_eg_billy
         - light.arbeitszimmer_eg_jetstrom
   mode: single
-- id: '1781790965082'
-  alias: Abends Fensterwarnung
-  description: ''
-  triggers:
-  - trigger: state
-    entity_id:
-    - light.standardbeleuchtung
-    from:
-    - 'on'
-    to:
-    - 'off'
-  conditions:
-  - condition: state
-    entity_id: binary_sensor.fenster
-    state:
-    - 'on'
-  - condition: state
-    entity_id: binary_sensor.esisthell
-    state:
-    - 'off'
-  actions:
-  - action: script.tts_with_volume
-    metadata: {}
-    data:
-      target_volume: 1
-      msg: Offene Fenster {{ fenster_msg }}
-      target_device: 2bcd073e7826d5b9ad641dcd745812a5
-  mode: single
-  variables:
-    fenster_msg: "{% set offene = expand('binary_sensor.fenster')\n  | selectattr('state',
-      'eq', 'on')\n  | map(attribute='name')\n  | list\n  | join(',\\n ') %}\n{{ offene
-      }}"
 - id: '1784297988643'
   alias: Auto bewegt sich
   description: ''
@@ -1013,7 +876,7 @@
       - action: light.toggle
         metadata: {}
         target:
-          entity_id: light.wohnzimmerlicht_switch_0
+          entity_id: light.wohnzimmer_deckenlicht
         data: {}
     - conditions:
       - condition: trigger
@@ -1163,7 +1026,7 @@
       - action: light.toggle
         metadata: {}
         target:
-          entity_id: light.shellyplus1_441793cd98cc_switch_0
+          entity_id: light.flur_og_flurlicht
         data: {}
     - conditions:
       - condition: trigger
@@ -1184,7 +1047,7 @@
       - action: light.toggle
         metadata: {}
         target:
-          entity_id: light.treppenlicht_switch_0
+          entity_id: light.treppe_treppenlicht
         data: {}
     - conditions:
       - condition: trigger
@@ -1298,7 +1161,7 @@
       - action: light.toggle
         metadata: {}
         target:
-          entity_id: light.treppenlicht_switch_0
+          entity_id: light.treppe_treppenlicht
         data: {}
     - conditions:
       - condition: trigger
@@ -1341,8 +1204,8 @@
         metadata: {}
         target:
           entity_id:
-          - light.garderobenlicht_switch_0
-          - light.garderobenstimmung_switch_0
+          - light.garderobe_garderobenlicht
+          - light.garderobe_garderobenstimmung
         data: {}
     - conditions:
       - condition: trigger
@@ -1414,7 +1277,8 @@
   - choose:
     - conditions:
       - condition: trigger
-        id: away
+        id:
+        - away
       sequence:
       - action: input_number.set_value
         target:
@@ -1490,10 +1354,19 @@
     (sensor.waschmaschine_power) nach einem Waschgang wieder auf ~0 W fällt.
   triggers:
   - trigger: numeric_state
-    entity_id: sensor.waschmaschine_power
-    below: 2
+    entity_id:
+    - sensor.waschmaschine_power
+    below: 5
     for:
       minutes: 2
+    enabled: false
+  - trigger: state
+    entity_id:
+    - sensor.waschmaschine_operation_state
+    from:
+    - run
+    to:
+    - finished
   actions:
   - action: notify.send_message
     target:
@@ -1511,8 +1384,9 @@
   description: Benachrichtigt per aPhone-Push und TTS am KüchenPod, sobald der Trockner
     (sensor.trockner_power) nach einem Trockengang wieder auf ~0 W fällt.
   triggers:
-  - below: 2
-    entity_id: sensor.trockner_power
+  - below: 5
+    entity_id:
+    - sensor.trockner_power
     for:
       minutes: 2
     trigger: numeric_state
@@ -1528,24 +1402,6 @@
       target_device: 2bcd073e7826d5b9ad641dcd745812a5
       target_volume: 0.8
   mode: single
-- id: '1791998619626'
-  alias: Bad EG Spiegellicht per Taste 2 umschalten
-  description: Lichtschalter Bad EG, Taste 2 (Relais entkoppelt) schaltet das Spiegellicht
-    um.
-  triggers:
-  - trigger: event.received
-    target:
-      entity_id: event.lichtschalter_bad_eg_button_2
-    options:
-      event_type:
-      - toggle
-  conditions: []
-  actions:
-  - action: switch.toggle
-    target:
-      entity_id: switch.bad_eg_spiegellicht_bad_eg
-  mode: queued
-  max: 5
 - id: '1792313316323'
   alias: Heizung – WW-Hysterese Abendboost
   description: '20:00: WW-Hysterese auf 1 K, damit der Speicher abends bei ca. 54
@@ -1590,3 +1446,120 @@
         target:
           entity_id: number.heizung_ww_hysterese
   mode: queued
+- id: '1792688481308'
+  alias: Heizkreis – Frostschutz Kinderzimmer
+  description: Frostschutz-Puls via Blueprint
+  use_blueprint:
+    path: heizkreis_frostschutz.yaml
+    input:
+      temperature_sensor: sensor.kinderzimmer_thermostat_raumtemperatur
+      limit: input_number.frostschutz_grenze_kinderzimmer
+      zbmini_switch: switch.kinderzimmer_heizkreisventil
+      detach_switch: switch.kinderzimmer_heizkreisventil_detach_relay
+- id: '1792688481305'
+  alias: Heizkreis – Frostschutz Schlafzimmer
+  description: Frostschutz-Puls via Blueprint
+  use_blueprint:
+    path: heizkreis_frostschutz.yaml
+    input:
+      temperature_sensor: sensor.schlafzimmer_thermostat_raumtemperatur
+      limit: input_number.frostschutz_grenze_schlafzimmer
+      zbmini_switch: switch.schlafzimmer_heizkreisventil
+      detach_switch: switch.schlafzimmer_heizkreisventil_detach_relay
+      pulse_minutes: 10
+      pause_minutes: 40
+- id: '1792688481337'
+  alias: Heizkreis – Frostschutz Arbeitszimmer OG
+  description: Frostschutz-Puls via Blueprint
+  use_blueprint:
+    path: heizkreis_frostschutz.yaml
+    input:
+      temperature_sensor: sensor.arbeitszimmer_og_thermostat_raumtemperatur
+      limit: input_number.frostschutz_grenze_arbeitszimmer_og
+      zbmini_switch: switch.arbeitszimmer_og_heizkreisventil
+      detach_switch: switch.arbeitszimmer_og_heizkreisventil_detach_relay
+      pause_minutes: 45
+- id: '1792688481340'
+  alias: Heizkreis – Frostschutz Arbeitszimmer EG
+  description: Frostschutz-Puls via Blueprint
+  use_blueprint:
+    path: heizkreis_frostschutz.yaml
+    input:
+      temperature_sensor: sensor.arbeitszimmer_eg_thermostat_raumtemperatur
+      limit: input_number.frostschutz_grenze_arbeitszimmer_eg
+      zbmini_switch: switch.arbeitszimmer_eg_heizkreisventil
+      detach_switch: switch.arbeitszimmer_eg_heizkreisventil_detach_relay
+- id: letsencrypt_erneuern_und_neustart
+  alias: 'Zertifikat: Let''s Encrypt erneuern und HA neu laden'
+  description: 'Täglich 03:00: Läuft das ausgelieferte Zertifikat in weniger als 10
+    Tagen ab (oder ist ungültig/abgelaufen), startet das Let''s-Encrypt-App (force_renew),
+    danach wird HA neu gestartet. Der Sensor wird alle 12 h aktualisiert, die Restlaufzeit
+    kann also minimal ~9,5 Tage betragen.'
+  triggers:
+  - trigger: time
+    at: 03:00:00
+  conditions:
+  - condition: template
+    value_template: '{% set s = states(''sensor.homeassistant_jakof_eu_cert_expiry'')
+      %}{{ s != ''unavailable'' and (s == ''unknown'' or (s | as_datetime - now()).total_seconds()
+      < 864000) }}'
+  actions:
+  - action: hassio.app_start
+    data:
+      app: core_letsencrypt
+  - delay:
+      minutes: 5
+  - action: homeassistant.restart
+  mode: single
+- id: '1794915774677'
+  alias: Keiner da -> abschließen
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - group.alleda
+    to:
+    - 'off'
+  conditions: []
+  actions:
+  - if:
+    - condition: not
+      conditions:
+      - condition: lock.is_locked
+        target:
+          entity_id: lock.aqara_smart_lock_u200
+        options:
+          behavior: any
+          for: 00:00:00
+    then:
+    - action: lock.lock
+      metadata: {}
+      target:
+        entity_id: lock.aqara_smart_lock_u200
+      data: {}
+  mode: single
+- id: '1794915823555'
+  alias: Ankommen -> aufschließen
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - group.alleda
+    to:
+    - 'on'
+  conditions: []
+  actions:
+  - if:
+    - condition: lock.is_locked
+      target:
+        entity_id: lock.aqara_smart_lock_u200
+      options:
+        behavior: any
+        for: 00:00:00
+    then:
+    - action: lock.unlock
+      metadata: {}
+      target:
+        entity_id: lock.aqara_smart_lock_u200
+      data: {}
+  mode: single

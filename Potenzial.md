@@ -36,7 +36,7 @@ klar ist, was *nicht* angefasst werden sollte.
 - **Fund (Auswahl):**
   - `Büro OG Fenster` – `device`-Trigger + `is_open`-`device`-Conditions mit Hex-`device_id`/`entity_id`.
   - `SaugenEG` – Button-Press über `device_id` + Hex-`entity_id`.
-  - `Roborock Return To Base` – `vacuum.dock` über `device_id`.
+  - `Roborock Return To Base` – ursprünglich `vacuum.dock` über `device_id`; seit 2026-11-17 als [Skript](./scripts.yaml) mit `vacuum.return_to_base` und `entity_id` direkt an HomeKit freigegeben. Bisherige Automation und Schalter-Helper entfernt; Apple-Home-Szenen ggf. auf das neue Zubehör umstellen.
   - `Zitrone gießen` – `humidity`-`device`-Trigger + `is_humidity`-`device`-Condition.
   - `HeizungsBoost` / `HeizungsBoost`-Rückstellung – `number.set_value` über `device_id`.
   - `Schlafzimmer` (`1776798325469`) – ZHA-`device`-Trigger + `light.toggle` auf `device_id`.

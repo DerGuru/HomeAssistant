@@ -175,11 +175,7 @@
         state:
         - 'off'
       sequence:
-      - action: light.turn_on
-        metadata: {}
-        data: {}
-        target:
-          entity_id: light.standardbeleuchtung
+      - action: script.standardbeleuchtung
     - conditions:
       - condition: state
         entity_id: group.alleda
@@ -835,8 +831,7 @@
             value_template: '{{ true }}'
           sequence:
           - action: light.turn_on
-            target:
-              entity_id: '{{ target_light }}'
+            target: '{{ lighting_target }}'
             data:
               brightness_step_pct: '{{ dim_step_pct }}'
           - delay:
@@ -846,17 +841,32 @@
         id: button_1_double
       sequence:
       - action: light.turn_on
-        target:
-          entity_id: '{{ target_light }}'
+        target: '{{ lighting_target }}'
         data:
           brightness_pct: 100
     - conditions:
       - condition: trigger
         id: button_2_single
       sequence:
-      - action: light.toggle
-        target:
-          entity_id: '{{ target_light }}'
+      - if:
+        - condition: light.is_on
+          target:
+            area_id:
+            - living_room
+            - garderobe
+            - kitchen
+            exclude:
+              entity_id:
+              - light.wohnzimmer_deckenlicht
+              - light.kuche_deckenlicht
+              - light.garderobe_garderobenlicht
+          options:
+            behavior: any
+        then:
+        - action: light.turn_off
+          target: '{{ lighting_target }}'
+        else:
+        - action: script.standardbeleuchtung
     - conditions:
       - condition: trigger
         id: button_2_hold
@@ -888,8 +898,7 @@
             value_template: '{{ true }}'
           sequence:
           - action: light.turn_on
-            target:
-              entity_id: '{{ target_light }}'
+            target: '{{ lighting_target }}'
             data:
               brightness_step_pct: -{{ dim_step_pct }}
           - delay:
@@ -899,13 +908,21 @@
         id: button_3_double
       sequence:
       - action: light.turn_off
-        target:
-          entity_id: '{{ target_light }}'
+        target: '{{ lighting_target }}'
     enabled: true
   variables:
-    target_light: light.standardbeleuchtung
     dim_step_pct: 10
     dim_delay_ms: 100
+    lighting_target:
+      area_id:
+      - living_room
+      - garderobe
+      - kitchen
+      exclude:
+        entity_id:
+        - light.wohnzimmer_deckenlicht
+        - light.kuche_deckenlicht
+        - light.garderobe_garderobenlicht
   mode: restart
 - id: '1785919647799'
   alias: Oberflurschalter
@@ -1563,3 +1580,19 @@
         entity_id: lock.aqara_smart_lock_u200
       data: {}
   mode: single
+- id: '1795362355280'
+  alias: Licht – Weihnachtsbaum per Shortcut Button
+  description: Schaltet den Weihnachtsbaum beim toggle-zha_event des Shortcut Buttons um.
+  triggers:
+  - trigger: event
+    event_type: zha_event
+    event_data:
+      device_ieee: f8:44:77:ff:fe:1e:0e:ac
+      command: toggle
+  conditions: []
+  actions:
+  - action: light.toggle
+    target:
+      entity_id: light.wohnzimmer_weihnachtsbaum
+  mode: queued
+  max: 10

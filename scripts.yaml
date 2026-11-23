@@ -1,3 +1,22 @@
+standardbeleuchtung:
+  alias: Standardbeleuchtung
+  description: Schaltet die Beleuchtung in Wohnzimmer, Garderobe und Kueche ein,
+    ausgenommen die jeweiligen Deckenlichter. Direkt aus Apple Home aufrufbar.
+  icon: mdi:lightbulb-group
+  mode: single
+  sequence:
+  - action: light.turn_on
+    target:
+      area_id:
+      - living_room
+      - garderobe
+      - kitchen
+      exclude:
+        entity_id:
+        - light.wohnzimmer_deckenlicht
+        - light.kuche_deckenlicht
+        - light.garderobe_garderobenlicht
+    data: {}
 roborock_return_to_base:
   alias: Roborock Return To Base
   description: Schickt den Roborock zur Ladestation. Direkt ueber die HomeKit-Bridge aus Apple Home aufrufbar.
